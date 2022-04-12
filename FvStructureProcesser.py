@@ -4,6 +4,8 @@ import pandas as pd
 import Bio.PDB as BP
 import anarci
 import re
+from util import read_in,write_out,extract_hetatm,add_chain
+
 from Bio.PDB.StructureBuilder import StructureBuilder
 from Bio.Data import SCOPData
 from Bio.PDB.Chain import Chain
@@ -26,14 +28,7 @@ class FvSpliter:
         """
         self.object=pdb_object.copy()
         self.object.detach_parent()
-        # self.hetatm=Chain('hetatm')
-        # if include_hetatm:
-        #     for i in self.object:
-        #         if i.id[0]!=' ':
-        #             self.hetatm.add(i)
-        #     for i in self.hetatm:
-        #         self.object.detach_child(i.id)
-        self.hetatm=FvSpliter._extract_hetatm(self.object)
+        self.hetatm=extract_hetatm(self.object,inplace=True)[1] if include_hetatm else Chain('hetatm')
         self.residue_map=pd.DataFrame()
         self.residue_map['original_id']=[residue.id for residue in self.object]
         self.residue_map.set_index(['original_id'],inplace=True)
@@ -89,32 +84,23 @@ class FvSpliter:
             #     self.split_object[i[1]['annotation']].append(self.object[i[0]].copy())
         return self.splited_object
 
-    @staticmethod
-    def _extract_hetatm(input:Chain)->Chain:
-        '''
-        '''
-        output=Chain('hetatm')
-        for i in input:
-            if i.id[0]!=' ':
-                output.add(i)
-        for i in output:
-            input.detach_child(i.id)
-        return output
-
 
 class FvStructureProcesser:
     '''
     '''
 
-    def __init__(self) -> None:
+    def __init__(self,file:str='',struct:Structure=Structure('tmp'),) -> None:
         '''
         '''
-        pass
+        assert(bool(file)^bool(struct)),'either specify a filepath or a Structure instance'
+        if file:
+            self.object=read_in(file,file)
+        else:
+            self.object=struct.copy()
         
-    def set_structure(self,file:str,id:str='tmp',scheme='a')->None:
+    def parse_structure(self,scheme='a')->None:
         '''
         '''
-        self.object=BP.PDBParser(QUIET=True).get_structure(id,file)
         self.scheme=scheme
         if len(self.object)>1:
             warnings.warn("multi-frame object detected."
@@ -123,14 +109,15 @@ class FvStructureProcesser:
         self.chain_list={chain.id :''.join([SCOPData.protein_letters_3to1[residue.get_resname()] 
                                             for residue in chain 
                                             if residue.id[0]==' ']) 
-                                            for chain in self.object[0]}
+                                            for chain in self.object[0] if len(chain)>0}
         
-        self.Fv_count={chain:anarci.run_anarci(sequence,scheme=scheme)[1][0]
+        self.Fv_count={chain:anarci.run_anarci(sequence,scheme=scheme)[1][0] if len(sequence)>0 else None
                         for chain,sequence in self.chain_list.items()}
         self.Fv_count={chain:len(count) if count is not None else 0
                         for chain,count in self.Fv_count.items()}
+        self._split_chains()
 
-    def split_chains(self)->None:
+    def _split_chains(self)->None:
         '''
         '''
         self.splited_chains={}
@@ -140,10 +127,10 @@ class FvStructureProcesser:
                 spliter.set_chain(self.object[0][chain_id])
                 self.splited_chains[chain_id]=spliter.split(self.scheme)
             else:
-                hetatm_chain=FvSpliter._extract_hetatm(self.object[0][chain_id])
+                hetatm_chain=extract_hetatm(self.object[0][chain_id])
                 self.splited_chains[chain_id]={'Ag0':self.object[0][chain_id],'hetatm':hetatm_chain}
     
-    def build_output(self,
+    def build_whole(self,
                     structure_id:str='tmp',
                     contain_linker:bool=True,
                     contain_antigen:bool=True,
@@ -180,21 +167,21 @@ class FvStructureProcesser:
                 new_chain_id=origin_chain_id.upper() if origin_chain_id.islower() else origin_chain_id.lower()
                 Fv_count=self.Fv_count[origin_chain_id]
                 if Fv_count==0 and contain_antigen:
-                    FvStructureProcesser._add_chain_to_builder(
+                    add_chain(
                             origin_chain['Ag0'],origin_chain_id,builder.structure[0])
                     if contain_hetatm:
-                        FvStructureProcesser._add_chain_to_builder(
+                        add_chain(
                                 origin_chain['hetatm'],new_chain_id,builder.structure[0])
                 elif Fv_count==1:
-                    FvStructureProcesser._add_chain_to_builder(
+                    add_chain(
                             origin_chain['Fv0'],origin_chain_id,builder.structure[0])
                     if contain_hetatm:
-                        FvStructureProcesser._add_chain_to_builder(
+                        add_chain(
                             origin_chain['Fv0'],new_chain_id,builder.structure[0])
                 elif Fv_count==2:
-                    FvStructureProcesser._add_chain_to_builder(
+                    add_chain(
                             origin_chain['Fv0'],origin_chain_id,builder.structure[0])
-                    FvStructureProcesser._add_chain_to_builder(
+                    add_chain(
                             origin_chain['Fv1'],new_chain_id,builder.structure[0])
                     if contain_hetatm:
                         warnings.warn('two Fv fragment has occupied all the chain id, ' 
@@ -211,42 +198,70 @@ class FvStructureProcesser:
                             'check your system or split them into multiple file for porcess.',
                             BiopythonWarning,)
                             break
-                        FvStructureProcesser._add_chain_to_builder(
+                        add_chain(
                             segment,chain_ids[i],builder.structure[0])
                         i += 1
                 if i==len(chain_ids):
                     break
-        self.build_structure=builder.get_structure()
+        self.built_structure=builder.get_structure()
         return builder.get_structure()
 
+    def build_single(self,
+                        chainid:str,
+                        allocate_chain_ids:list=[chr(i) for i in list(range(65,91))+list(range(97,123))],
+                        structure_id:str='tmp',
+                        )->Structure:
+        '''
+        '''
+        allocate_chain_ids=[i for i in allocate_chain_ids if (i not in self.Fv_count.keys()) or i==chainid ]
+        assert len(self.splited_chains[chainid])<=len(allocate_chain_ids),'more chain id needed!'
+        
+        builder=StructureBuilder()
+        builder.init_structure(structure_id)
+        builder.init_model(0)
+        
+        for chain in self.object[0]:
+            if chain.id != chainid:
+                add_chain(chain,chain.id,builder.structure[0])
+        
+        i=0
+        for segment in self.splited_chains[chainid].values():
+            add_chain(segment,allocate_chain_ids[i],builder.structure[0])
+            i += 1
+        self.built_structure=builder.get_structure()
+        return builder.get_structure()
+
+    def update_structure(self)->None:
+        '''
+        '''
+        self.object=self.built_structure
+        self.parse_structure(self.scheme)
+  
     def write_processed_structure(self,file:str='tmp.pdb',write_end:bool=True, preserve_atom_numbering:bool=False)->None:
         '''
         '''
-        io = BP.PDBIO()
-        io.set_structure(self.build_structure)
-        io.save(file,write_end=write_end,preserve_atom_numbering=preserve_atom_numbering)
+        write_out(self.built_structure,file,write_end,preserve_atom_numbering)
 
-    @staticmethod
-    def _add_chain_to_builder(segment:Chain,new_id:str,structure:Structure)->None:
-        '''
-        '''
-        segment_to_build=segment.copy()
-        segment_to_build.id=new_id
-        segment_to_build.detach_parent()
-        structure.add(segment_to_build)
 
 #test code
 if __name__ == '__main__':
-    import sys
+    import sys,os
     test_path=sys.argv[1]
-    Fv=FvStructureProcesser()
-    Fv.set_structure(test_path)
-    Fv.split_chains()
-    Fv.build_output(contain_linker=False,contain_antigen=False,contain_hetatm=False,reserve_chain_id=False)
-    Fv.write_processed_structure('only_Fv_changed_id.pdb')
-    Fv.build_output(reserve_chain_id=False)
-    Fv.write_processed_structure('only_Fv.pdb')
-    Fv.build_output(contain_linker=False,contain_antigen=False,contain_hetatm=False,reserve_chain_id=True)
-    Fv.write_processed_structure('changed_id.pdb')
-    Fv.build_output(reserve_chain_id=True)
-    Fv.write_processed_structure('full.pdb')
+    test_chain1=sys.argv[2]
+    test_chain2=sys.argv[3]
+    os.mkdir('test')
+    Fv=FvStructureProcesser(test_path)
+    Fv.parse_structure()
+    Fv.build_whole(contain_linker=False,contain_antigen=False,contain_hetatm=False,reserve_chain_id=False)
+    Fv.write_processed_structure('test/only_Fv_changed_id.pdb')
+    Fv.build_whole(reserve_chain_id=False)
+    Fv.write_processed_structure('test/only_Fv.pdb')
+    Fv.build_whole(contain_linker=False,contain_antigen=False,contain_hetatm=False,reserve_chain_id=True)
+    Fv.write_processed_structure('test/keep_id.pdb')
+    Fv.build_whole(reserve_chain_id=True)
+    Fv.write_processed_structure('test/full.pdb')
+    Fv.build_single(test_chain1)
+    Fv.write_processed_structure('test/single_chain.pdb')
+    Fv.update_structure()
+    Fv.build_single(test_chain2)
+    Fv.write_processed_structure('test/iterated.pdb')
