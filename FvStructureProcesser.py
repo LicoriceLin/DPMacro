@@ -1,3 +1,7 @@
+'''
+Objects to split and renumber residue/chains in Fv containing pdb.
+available function: see the test codes.
+'''
 import typing,warnings
 # import numpy as np
 import pandas as pd
@@ -16,6 +20,11 @@ allowd_scheme=typing.Literal['c','chothia','k','kabat','i','imgt','a','aho','m',
 
 class FvSpliter:
     '''
+    semi-private object.
+    a class only for Fv-containing chain process.
+    useful method:
+    .set_chain(pdb_object,include_hetatm) & .split(scheme)
+    function obvious as the name indicated.  
     '''
 
     def __init__(self)->None:
@@ -25,6 +34,9 @@ class FvSpliter:
 
     def set_chain(self,pdb_object:Chain,include_hetatm:bool=True)->None:
         """
+        include_hetatm: if you expect chain contain hetatm residues(default=True). 
+                        set to False when you want to omit these residue.
+                        or when you want 
         """
         self.object=pdb_object.copy()
         self.object.detach_parent()
@@ -38,6 +50,8 @@ class FvSpliter:
    
     def _run_anarci(self,scheme:allowd_scheme)->None:
         """
+        private method.
+
         """
         self.scheme=scheme
         anarci_maps=anarci.run_anarci(self.sequence,scheme=scheme)[1][0]
@@ -87,19 +101,28 @@ class FvSpliter:
 
 class FvStructureProcesser:
     '''
+    a class for whole structure containing Fv domain.
+    not supporting multiframe right now. in this case you can use `FvSpliter`.
     '''
 
-    def __init__(self,file:str='',struct:Structure=Structure('tmp'),) -> None:
+    def __init__(self,struct:typing.Union[str,Structure]) -> None:
         '''
         '''
-        assert(bool(file)^bool(struct)),'either specify a filepath or a Structure instance'
-        if file:
-            self.object=read_in(file,file)
-        else:
+        if isinstance(struct,str):
+            self.object=read_in(struct,struct)
+        elif isinstance(struct,Structure):
             self.object=struct.copy()
+        else:
+            raise TypeError
         
     def parse_structure(self,scheme='a')->None:
         '''
+        scheme: the numbering scheme to split the chains.
+
+        yielding following property:
+        chain_list:dict,{chainid,sequence}
+        Fv_count:dict,{chainid:how many Fv domain in each chain}
+        splited_chains:splited chains (from FvSpliter)
         '''
         self.scheme=scheme
         if len(self.object)>1:
@@ -195,7 +218,7 @@ class FvStructureProcesser:
                     if id_pattern.match(segment.id):
                         if i==len(chain_ids):
                             warnings.warn('builder has run out of all available chain ids'
-                            'check your system or split them into multiple file for porcess.',
+                            'check your system or turn to the more personalized build_single method.',
                             BiopythonWarning,)
                             break
                         add_chain(
@@ -209,14 +232,19 @@ class FvStructureProcesser:
     def build_single(self,
                         chainid:str,
                         allocate_chain_ids:list=[chr(i) for i in list(range(65,91))+list(range(97,123))],
-                        structure_id:str='tmp',
+                        structure_id:typing.Union[str,None]=None,
                         )->Structure:
         '''
+        split
+        chainid:chain to build
+        allocate_chain_ids: a list contains the chain id you want to allocate to the splited chains.
+        structure_id : the structure id for the built new structure. None to keep the original id.
         '''
         allocate_chain_ids=[i for i in allocate_chain_ids if (i not in self.Fv_count.keys()) or i==chainid ]
         assert len(self.splited_chains[chainid])<=len(allocate_chain_ids),'more chain id needed!'
         
         builder=StructureBuilder()
+        structure_id= structure_id if structure_id else self.object.id
         builder.init_structure(structure_id)
         builder.init_model(0)
         
@@ -246,22 +274,38 @@ class FvStructureProcesser:
 #test code
 if __name__ == '__main__':
     import sys,os
+    #arg1:the path to test pdb file
     test_path=sys.argv[1]
+    #arg2&3:the first&second chain to test in `build_single` method
     test_chain1=sys.argv[2]
     test_chain2=sys.argv[3]
+
     os.mkdir('test')
     Fv=FvStructureProcesser(test_path)
     Fv.parse_structure()
+    
+    #test function:write only Fvs, renumber chain id from A 
     Fv.build_whole(contain_linker=False,contain_antigen=False,contain_hetatm=False,reserve_chain_id=False)
     Fv.write_processed_structure('test/only_Fv_changed_id.pdb')
+    
+    #test function:write all component, renumber chain id from A 
     Fv.build_whole(reserve_chain_id=False)
     Fv.write_processed_structure('test/only_Fv.pdb')
+
+    #test function:write only Fvs,keep the original chain id ( upper & lower style for diabody )
     Fv.build_whole(contain_linker=False,contain_antigen=False,contain_hetatm=False,reserve_chain_id=True)
     Fv.write_processed_structure('test/keep_id.pdb')
+
+    #test function:write all component, keep the original chain id ( upper & lower style for diabody )
+    #can be unstable in many cases.
     Fv.build_whole(reserve_chain_id=True)
     Fv.write_processed_structure('test/full.pdb')
+    
+    #test function:split chain1, renumber from chain A ,and skip the already existing chains
     Fv.build_single(test_chain1)
     Fv.write_processed_structure('test/single_chain.pdb')
+    
+    #test function:if update the Fv.object according Fv.built_structure runs well. 
     Fv.update_structure()
     Fv.build_single(test_chain2)
     Fv.write_processed_structure('test/iterated.pdb')
