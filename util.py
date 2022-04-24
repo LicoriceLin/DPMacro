@@ -66,8 +66,10 @@ def add_chain(segment:Chain,new_id:str,Model:Model)->None:
     segment_to_build.detach_parent()
     Model.add(segment_to_build)
 
-def to_resid(input:Union[str,Tuple[str,int,str]])->Tuple[str,int,str]:
+def to_resid(input:Union[int,str,Tuple[str,int,str]])->Tuple[str,int,str]:
     '''
+    a standard method to convert str, int to standard triplet biopython residue code tuple.
+    return itself if the standard code is give.
     '''
     if isinstance(input,tuple) and len(input)==3:
         try:
@@ -76,7 +78,7 @@ def to_resid(input:Union[str,Tuple[str,int,str]])->Tuple[str,int,str]:
             raise TypeError
     else:
         try:
-            return tuple(' ',input,' ')
+            return (' ',int(input),' ')
         except:
             raise TypeError
         
