@@ -107,6 +107,8 @@ class FvStructureProcesser:
 
     def __init__(self,struct:typing.Union[str,Structure]) -> None:
         '''
+        init the object,
+        put the struct into .object property
         '''
         if isinstance(struct,str):
             self.object=read_in(struct,struct)
@@ -122,7 +124,7 @@ class FvStructureProcesser:
         yielding following property:
         chain_list:dict,{chainid,sequence}
         Fv_count:dict,{chainid:how many Fv domain in each chain}
-        splited_chains:splited chains (from FvSpliter)
+        splited_chains:{chainid:list[splited Chains object]} (from FvSpliter)
         '''
         self.scheme=scheme
         if len(self.object)>1:
@@ -142,6 +144,8 @@ class FvStructureProcesser:
 
     def _split_chains(self)->None:
         '''
+        private method
+        generate the 
         '''
         self.splited_chains={}
         for chain_id in self.chain_list:
