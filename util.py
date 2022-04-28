@@ -84,7 +84,6 @@ def to_resid(input:Union[int,str,Tuple[str,int,str]])->Tuple[str,int,str]:
         
 
 
-
 #test code
 if __name__ == '__main__':
     import sys
