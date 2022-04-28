@@ -54,3 +54,15 @@ class BiopyInternalFeature(ResidueFeatureExtractor):
                 _residue.xtra['CHI1_INTERNAL']=_ric('chi1') if _ric('chi1') else 0
 
         self._object_feature_to_frame()
+
+
+if __name__=='__main__':
+    import sys
+    testpdb=sys.argv[1]
+    Bpi=BiopyInternalFeature(dssp_argsargs={'acc_array':"Wilke"},
+                            sasa_args={'probe_radius':1.40, 'n_points':300},
+                            hse_args={'radius':18, 'offset':0})
+    Bpi.transform(testpdb)
+    if not os.path.isdir('test'):
+        os.mkdir('test')
+    Bpi.frame.to_csv('test/testBiopyInternalFeature.csv')

@@ -1,12 +1,14 @@
 from Bio.PDB.StructureBuilder import StructureBuilder
-from Bio.Data import SCOPData
-from Bio.PDB.Chain import Chain
+# from Bio.Data import SCOPData
+# from Bio.PDB.Chain import Chain
 from Bio.PDB.Structure import Structure
+from Bio.PDB.Entity import Entity
 import pandas as pd
-import typing
+import numpy as np
+from typing import Union,Literal,Tuple
 from util import to_resid,read_in,extract_hetatm
 
-allowed_level=typing.Literal['M','C','R']
+# allowed_level=typing.Literal['M','C','R']
 
 class StructFeatureExtractor:
     '''
@@ -33,7 +35,7 @@ class StructFeatureExtractor:
             features_='null'
         return f'<Extractor : {self.operation_name} : {struct_id_} : {features_}>'
     
-    def _set_structure(self,struct:typing.Union[str,Structure])->None:
+    def _set_structure(self,struct:Union[str,Structure])->None:
         '''
         '''
         if isinstance(struct,str):
@@ -59,7 +61,7 @@ class StructFeatureExtractor:
         '''
         pass
 
-    def transform(self,struct:typing.Union[str,Structure])->pd.DataFrame:
+    def transform(self,struct:Union[str,Structure])->pd.DataFrame:
         '''
         '''
         self._set_structure(struct)
@@ -107,18 +109,19 @@ class ChainFeatureExtractor(StructFeatureExtractor):
     '''
     ''' 
     def _init_dataframe(self)->None:
-        _index_list=[[],[]]
-        for model in self.object:
-            for chain in model:
-                _index_list[0].append(model.id)
-                _index_list[1].append(chain.id)
-        _index=pd.MultiIndex.from_arrays(_index_list,names=['model','chain'])
+        _index_list=[]
+        for chain in self.object.get_chains():
+            _index_list.append(chain.get_full_id()[1:])
+        _index_array=np.array(_index_list,dtype=object).transpose(1,0)
+        _index=pd.MultiIndex.from_arrays(_index_array,names=['model','chain'])
         self.frame=pd.DataFrame(index=_index)
 
+    
     def get_feature(self,feature,frame,chain)->pd.Series:
         '''
         '''
         return self.frame.loc[frame,chain][feature]
+
 
 class ResidueFeatureExtractor(StructFeatureExtractor):
     '''
@@ -126,15 +129,13 @@ class ResidueFeatureExtractor(StructFeatureExtractor):
     def _init_dataframe(self)->None:
         '''
         '''
-        _index_list=[[],[],[]]
-        for model in self.object:
-            for chain in model:
-                for residue in chain:
-                    _index_list[0].append(model.id)
-                    _index_list[1].append(chain.id)
-                    _index_list[2].append(residue.id)
-        _index=pd.MultiIndex.from_arrays(_index_list,names=['model','chain','residue'])
-        self.frame=pd.DataFrame(index=_index)
+        _index_list=[]
+        for residue in self.object.get_residues():
+            _index_list.append(residue.get_full_id()[1:])
+        # _index_array=np.array(_index_list,dtype=object).transpose(1,0)
+        # _index=pd.MultiIndex.from_arrays(_index_array,names=['model','chain','residue'])
+        # self.frame=pd.DataFrame(index=_index)
+        self.frame=pd.DataFrame(_index_list,columns=['model','chain','residue'])
 
     def _object_feature_to_frame(self) -> None:
         '''
@@ -152,11 +153,16 @@ class ResidueFeatureExtractor(StructFeatureExtractor):
             self.frame[key]=value
 
 
-class DistanceRelyFeatureExtractor:
-    def __init__(self)->None:
+class DistanceRelyFeatureExtractor(StructFeatureExtractor):
+    '''
+    '''
+    def _produce_tree(self,entity:Entity)->None:
         pass
-    def _produce_tree(self)->None:
+
+    def _distance_between_entity(self,
+    entity1:Entity,entity2:Entity)->Tuple[tuple,tuple,float]:
         pass
+        
 
 class PretrainedFeatureExtractor:
     pass
