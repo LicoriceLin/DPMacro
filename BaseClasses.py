@@ -5,9 +5,9 @@ from Bio.PDB.Structure import Structure
 from Bio.PDB.Entity import Entity
 import pandas as pd
 import numpy as np
-from typing import Union,Literal,Tuple
+from typing import Union,Literal,Tuple,Dict
 from util import to_resid,read_in,extract_hetatm
-
+from Data import amino3to1dict
 # allowed_level=typing.Literal['M','C','R']
 
 class StructFeatureExtractor:
@@ -108,13 +108,19 @@ class ModelFeatureExtractor(StructFeatureExtractor):
 class ChainFeatureExtractor(StructFeatureExtractor):  
     '''
     ''' 
-    def _init_dataframe(self)->None:
+    def _init_dataframe(self,from_residue:bool=False)->None:
         _index_list=[]
         for chain in self.object.get_chains():
             _index_list.append(chain.get_full_id()[1:])
-        _index_array=np.array(_index_list,dtype=object).transpose(1,0)
-        _index=pd.MultiIndex.from_arrays(_index_array,names=['model','chain'])
-        self.frame=pd.DataFrame(index=_index)
+        # _index_array=np.array(_index_list,dtype=object).transpose(1,0)
+        # _index=pd.MultiIndex.from_arrays(_index_array,names=['model','chain'])
+        self.frame=pd.DataFrame(_index_list,columns=['model','chain'])
+
+        if from_residue:
+            _index_list=[]
+            for residue in self.object.get_residues():
+                _index_list.append(residue.get_full_id()[1:])
+            self.residue_frame=pd.DataFrame(_index_list,columns=['model','chain','residue'])
 
     
     def get_feature(self,feature,frame,chain)->pd.Series:
@@ -130,13 +136,15 @@ class ResidueFeatureExtractor(StructFeatureExtractor):
         '''
         '''
         _index_list=[]
+        object_list=[]
         for residue in self.object.get_residues():
-            _index_list.append(residue.get_full_id()[1:])
+            _index_list.append(residue.get_full_id()[1:]+(residue.get_resname(),))
+            object_list.append(residue)
         # _index_array=np.array(_index_list,dtype=object).transpose(1,0)
         # _index=pd.MultiIndex.from_arrays(_index_array,names=['model','chain','residue'])
         # self.frame=pd.DataFrame(index=_index)
-        self.frame=pd.DataFrame(_index_list,columns=['model','chain','residue'])
-
+        self.frame=pd.DataFrame(_index_list,columns=['model','chain','residue','resname'])
+        self.frame['object']=object_list
     def _object_feature_to_frame(self) -> None:
         '''
         '''
@@ -152,6 +160,8 @@ class ResidueFeatureExtractor(StructFeatureExtractor):
         for key,value in _feature_dicts.items():
             self.frame[key]=value
 
+            
+
 
 class DistanceRelyFeatureExtractor(StructFeatureExtractor):
     '''
@@ -162,16 +172,35 @@ class DistanceRelyFeatureExtractor(StructFeatureExtractor):
     def _distance_between_entity(self,
     entity1:Entity,entity2:Entity)->Tuple[tuple,tuple,float]:
         pass
-        
+
+
+class SeqFeatureExtractor:
+    '''
+    '''
+    def __init__(self):
+        pass
+
+    def _set_seqs(self,seqs:str):
+        self.seq=seqs
+        pass
+
+    def _init_dataframe(self):
+        _seq_list=list(self.seq)
+        _resname=[amino3to1dict.get(i,'XXX') for i in _seq_list]
+        self.frame=pd.DataFrame(_seq_list,columns=['resname1'])
+        self.frame['resname']=_resname
+    def _produce_feature(self)->None:
+        pass
+
+    def transform(self,input:str)->pd.DataFrame:
+        self._set_seqs(input)
+        self._init_dataframe()
+        self._produce_feature()
+        return self.frame
 
 class PretrainedFeatureExtractor:
     pass
-
-class DirtyTmpfileFeatureExtractor:
-    pass
-
-class SeqFeatureExtractor:
-    pass
-
 class BatchProcessor:
+    pass
+class DirtyTmpfileFeatureExtractor:
     pass

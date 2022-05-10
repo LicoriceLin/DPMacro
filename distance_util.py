@@ -1,68 +1,53 @@
+from Bio.PDB.Structure import Structure
 from Bio.PDB.Entity import Entity
 from typing import List,Tuple,Union,Dict
 import typing
+from Bio.PDB.Atom import Atom
 from Bio.PDB.kdtrees import KDTree
 import numpy as np
 import pandas as pd
+from util import idtuple2str,idstr2tuple,atom_object_from_frame
+import warnings
+from Bio import BiopythonParserWarning
 
 
-def idtuple2str(idtuple:Union[Tuple,str,int])->str:
-    '''
-    '''
-    if isinstance(idtuple,tuple):
-        idlist=[str(i) if i != ' ' else '_'  for i in idtuple  ]
-        return '|'.join(idlist)
-    else:
-        return str(idtuple) if idtuple != ' ' else '_'
-    
-def idstr2tuple(idstr:str)->Tuple:
-    '''
-    '''
-    def _(str):
-        try:
-            out=int(str)
-        except ValueError:
-            if str=='_':
-                out=' '
-            else:
-                out=str
-        return out
-    idlist=idstr.split('|')
-    idlist=[_(i) for i in idlist]
-    if len(idlist)>1:
-        return tuple(idlist)
-    elif len(idlist)==1:
-        return idlist[0]
-    else:
-        return ValueError
-
-def _atom_id_from_frame(frame:pd.DataFrame,index:int)->Tuple[int,str,tuple,tuple]:
-    '''
-    '''
-    assert set(['model','chain','residue','atom'])<set(frame.columns),'frame does not contain adequate columns'
-    _id=frame.loc[index][['model','chain','residue','atom']]
-    id=tuple(_id.map(idstr2tuple))
-    return id
-
-def produce_tree(entity:Union[Entity,List[Entity]])->Tuple[pd.DataFrame,KDTree]:
+def produce_tree(entity:Union[Entity,Atom,List[Entity],List[Atom]])->Tuple[pd.DataFrame,KDTree]:
     '''
     '''
     _atom_index_list=[]
     _atom_coord_list=[]
     _atom_resname_list=[]
+    _atom_list=[]
     if isinstance(entity,list):
         for _sub_entity in entity:
-            for _atom in _sub_entity.get_atoms():
+            if not isinstance(_sub_entity,Atom):
+                for _atom in _sub_entity.get_atoms():
+                    _full_id=_atom.get_full_id()[1:]
+                    _atom_index_list.append([idtuple2str(i) for i in _full_id])
+                    _atom_coord_list.append(_atom.coord)
+                    _atom_resname_list.append([_atom.get_parent().get_resname()])
+                    _atom_list.append(_atom)
+            else:
+                _atom=_sub_entity
                 _full_id=_atom.get_full_id()[1:]
                 _atom_index_list.append([idtuple2str(i) for i in _full_id])
                 _atom_coord_list.append(_atom.coord)
                 _atom_resname_list.append([_atom.get_parent().get_resname()])
+                _atom_list.append(_atom)
     elif isinstance(entity,Entity):
         for _atom in entity.get_atoms():
             _full_id=_atom.get_full_id()[1:]
             _atom_index_list.append([idtuple2str(i) for i in _full_id])
             _atom_coord_list.append(_atom.coord)
             _atom_resname_list.append([_atom.get_parent().get_resname()])
+            _atom_list.append(_atom)
+    elif isinstance(entity,Atom):
+        _atom=entity
+        _full_id=_atom.get_full_id()[1:]
+        _atom_index_list.append([idtuple2str(i) for i in _full_id])
+        _atom_coord_list.append(_atom.coord)
+        _atom_resname_list.append([_atom.get_parent().get_resname()])
+        _atom_list.append(_atom)
     else:
         raise TypeError
     
@@ -76,11 +61,14 @@ def produce_tree(entity:Union[Entity,List[Entity]])->Tuple[pd.DataFrame,KDTree]:
     # frame=pd.DataFrame(atom_coord,index=_index,columns=['x','y','z'])
     frame=pd.DataFrame(np.concatenate([atom_index,atom_resname],axis=1),columns=['model','chain','residue','atom','resname'])
     coord_frame=pd.DataFrame(atom_coord,columns=list('xyz'))
+    atom_frame=pd.DataFrame(_atom_list,columns=['object'])
+    frame=frame.join(coord_frame,how='right')
+    frame=frame.join(atom_frame,how='right')
     # return atom_index,atom_coord,atom_resname,frame.join(coord_frame,how='right'),tree
-    return frame.join(coord_frame,how='right'),tree
+    return frame,tree
 
 def distance_between_entity(
-        entity1:Union[Entity,List[Entity]],entity2:Union[Entity,List[Entity]])->Tuple[Tuple,Tuple,float]:
+        entity1:Union[Entity,List[Entity]],entity2:Union[Entity,List[Entity]])->Tuple[Atom,Atom,float]:
     '''
     '''
     frame1,tree1=produce_tree(entity1)
@@ -104,8 +92,8 @@ def distance_between_entity(
     # _id2=frame2.loc[entity2_index][['model','chain','residue','atom']]
     # id1=tuple(_id1.map(idstr2tuple))
     # id2=tuple(_id2.map(idstr2tuple))
-    id1=_atom_id_from_frame(frame1,entity1_index)
-    id2=_atom_id_from_frame(frame2,entity2_index)
+    id1=atom_object_from_frame(frame1,entity1_index)
+    id2=atom_object_from_frame(frame2,entity2_index)
 
     return id1,id2,distance
 
@@ -143,9 +131,41 @@ def atom_within_threshold(
         entity2_cord=np.array(i[1],dtype=np.float64)
         for i in tree1.search(entity2_cord,threshold):
             _outputdict[i.index]=min(i.radius,_outputdict.get(i.index,9999.9))
-    outputdict={_atom_id_from_frame(frame1,key):value for key,value in _outputdict.items()}
+    outputdict={atom_object_from_frame(frame1,key):value for key,value in _outputdict.items()}
     return outputdict
 
+def residue_distance_matrix(struct:Structure)->pd.DataFrame:
+    if len(object.child_list)>1:
+        warnings.warn("multi-frame object detected."
+             "only frame 0 will be processed.",
+             BiopythonParserWarning,)
+    index=[]
+    dis_matrix=[]
+    for residue in struct[0].get_residues():
+        index.append(residue)
+        dis_line=[]
+        for residue_ in struct.get_residues():
+            dis_line.append(distance_between_entity(residue,residue_)[2])
+        dis_matrix.append(dis_matrix)
+    dis_frame=pd.DataFrame(dis_matrix,index=index,columns=index)
+    return dis_frame
+
+def get_distance(res1:pd.DataFrame,res2:pd.DataFrame)->float:
+    dis=pd.merge(res1,res2,how='cross',suffixes=('_1','_2'))
+    dis['distance']=((dis['x_1']-dis['x_2'])**2
+        +(dis['y_1']-dis['y_2'])**2
+        +(dis['z_1']-dis['z_2'])**2)**0.5
+    return dis
+
+def frame_residue_distance_matrix(struct:Structure)->pd.Series:
+    frame=produce_tree(struct)[0][['object','x','y','z']]
+    frame['residue']=frame['object'].apply(Atom.get_parent)
+    cross_frame=get_distance(frame,frame)
+    distances = cross_frame.groupby(['residue_1','residue_2'])['distance'].min()
+    return distances
+
+
+    
 
 if __name__ == '__main__':
     import sys
@@ -157,5 +177,3 @@ if __name__ == '__main__':
     chain3=sys.argv[4]
     print(distance_between_entity(testcase[0][chain1],[testcase[0][chain2],testcase[0][chain3]]))
     print(atom_within_threshold(testcase[0][chain1],[testcase[0][chain2],testcase[0][chain3]],5))
-
-    

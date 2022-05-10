@@ -19,6 +19,9 @@ from Bio.PDB.Chain import Chain
 from Bio.PDB.Structure import Structure
 from Bio.PDB.Model import Model
 from Bio.PDB.Entity import Entity
+from Bio.PDB.Atom import Atom
+import pandas as pd 
+from Data import amino3to1dict
 from typing import List,Tuple,Union
 
 def read_in(file:str,id:str='tmp')->Structure:
@@ -82,6 +85,64 @@ def to_resid(input:Union[int,str,Tuple[str,int,str]])->Tuple[str,int,str]:
         except:
             raise TypeError
         
+def idtuple2str(idtuple:Union[Tuple,str,int])->str:
+    '''
+    '''
+    if isinstance(idtuple,tuple):
+        idlist=[str(i) if i != ' ' else '_'  for i in idtuple  ]
+        return '|'.join(idlist)
+    else:
+        return str(idtuple) if idtuple != ' ' else '_'
+    
+def idstr2tuple(idstr:str)->Tuple:
+    '''
+    '''
+    def _(str):
+        try:
+            out=int(str)
+        except ValueError:
+            if str=='_':
+                out=' '
+            else:
+                out=str
+        return out
+    idlist=idstr.split('|')
+    idlist=[_(i) for i in idlist]
+    if len(idlist)>1:
+        return tuple(idlist)
+    elif len(idlist)==1:
+        return idlist[0]
+    else:
+        return ValueError
+
+def atom_id_from_frame(frame:pd.DataFrame,index:int)->Tuple[int,str,tuple,tuple]:
+    '''
+    '''
+    assert set(['model','chain','residue','atom'])<set(frame.columns),'frame does not contain adequate columns'
+    _id=frame.loc[index][['model','chain','residue','atom']]
+    id=tuple(_id.map(idstr2tuple))
+    return id
+
+def atom_object_from_frame(frame:pd.DataFrame,index:int)->Atom:
+    '''
+    '''
+    assert set(['object'])<set(frame.columns),'frame does not contain adequate columns'
+    object=frame.loc[index]['object']
+    return object
+
+def residue_id_from_frame(frame:pd.DataFrame,index:int)->Tuple[int,str,tuple,tuple]:
+    '''
+    '''
+    assert set(['model','chain','residue'])<set(frame.columns),'frame does not contain adequate columns'
+    _id=frame.loc[index][['model','chain','residue']]
+    id=tuple(_id.map(idstr2tuple))
+    return id
+
+def get_seq(struct:Structure):
+    seq_dict=dict()
+    for chain in struct.get_chains():
+        seq_dict[chain.get_full_id()[1:]]=''.join([i.getresname() for i in chain.get_residues()])
+    return seq_dict
 
 
 #test code
