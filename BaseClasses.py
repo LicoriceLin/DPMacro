@@ -4,14 +4,17 @@ from Bio.PDB.StructureBuilder import StructureBuilder
 from Bio.PDB.Structure import Structure
 from Bio.PDB.Entity import Entity
 import pandas as pd
-import numpy as np
-from typing import Union,Literal,Tuple,Dict
-from util import to_resid,read_in,extract_hetatm
+# import numpy as np
+from typing import Union,Tuple,Dict,Iterable
+from util import read_in,extract_hetatm,sequence_from_frame
+from util import _list_feature_into_residue,_list_feature_into_frame,_integrated_residue_iterator
+from util import allowed_residue_source,allowd_scheme,RESIDUE_HOLDER
 from Data import amino3to1dict
-# allowed_level=typing.Literal['M','C','R']
 
 class StructFeatureExtractor:
     '''
+    parent of Model/Chain/ResidueFeatureExtractor
+    but the first 2 haven't been used yet.  
     '''
     def __init__(self,operation_name:str='',canonical_only:bool=True)->None:
         '''
@@ -44,6 +47,8 @@ class StructFeatureExtractor:
             self.object=struct.copy()
         else:
             raise TypeError
+        if self._canonical_only:
+            self._remove_hetatm()
         
     def _remove_hetatm(self)->None:
         '''
@@ -65,8 +70,6 @@ class StructFeatureExtractor:
         '''
         '''
         self._set_structure(struct)
-        if self._canonical_only:
-            self._remove_hetatm()
         self._init_dataframe()
         self._produce_feature()
         return self.frame
@@ -91,20 +94,51 @@ class StructFeatureExtractor:
         '''
         raise NotImplementedError
 
-
-class ModelFeatureExtractor(StructFeatureExtractor):
+class ResidueFeatureExtractor(StructFeatureExtractor):
     '''
-    '''
+    ''' 
     def _init_dataframe(self)->None:
         '''
         '''
         _index_list=[]
-        for model in self.object:
-            _index_list.append(model.id)
-        _index=pd.Index(_index_list,name=['model'])
-        self.frame=pd.DataFrame(index=_index)
-    
+        object_list=[]
+        for residue in self.object.get_residues():
+            _index_list.append(residue.get_full_id()[1:]+(residue.get_resname(),))
+            object_list.append(residue)
+        # _index_array=np.array(_index_list,dtype=object).transpose(1,0)
+        # _index=pd.MultiIndex.from_arrays(_index_array,names=['model','chain','residue'])
+        # self.frame=pd.DataFrame(index=_index)
+        self.frame=pd.DataFrame(_index_list,columns=['model','chain','residue','resname'])
+        self.frame['object']=object_list
 
+    def _object_feature_to_frame(self) -> None:
+        '''
+        '''
+        _init_flag=True
+        for _residue in self.object.get_residues():
+            _res_feats=_residue.xtra
+            if _init_flag:
+                _feature_dicts={key:[] for key in _res_feats.keys()}
+                _init_flag=False
+            for key,value in _res_feats.items():
+                _feature_dicts[key].append(value)
+        
+        for key,value in _feature_dicts.items():
+            self.frame[key]=value
+
+    def _produce_sequence(self,map:Dict[str,str]=amino3to1dict)->None:
+        # def list3_to_str1(list3:Iterable[str])->str:
+        #     return ''.join([map.get(i,'X') for i in list3])
+        # _seq_series=self.frame.groupby('chain')['resname'].apply(list3_to_str1)
+        # self.sequences=dict(_seq_series)
+        self.sequences=sequence_from_frame(self.frame,map)
+
+    def _reduce(self):
+        '''
+        reduce Residue property to Chain-level or Model-level property
+        '''
+        raise NotImplementedError
+#unused
 class ChainFeatureExtractor(StructFeatureExtractor):  
     '''
     ''' 
@@ -127,52 +161,6 @@ class ChainFeatureExtractor(StructFeatureExtractor):
         '''
         '''
         return self.frame.loc[frame,chain][feature]
-
-
-class ResidueFeatureExtractor(StructFeatureExtractor):
-    '''
-    ''' 
-    def _init_dataframe(self)->None:
-        '''
-        '''
-        _index_list=[]
-        object_list=[]
-        for residue in self.object.get_residues():
-            _index_list.append(residue.get_full_id()[1:]+(residue.get_resname(),))
-            object_list.append(residue)
-        # _index_array=np.array(_index_list,dtype=object).transpose(1,0)
-        # _index=pd.MultiIndex.from_arrays(_index_array,names=['model','chain','residue'])
-        # self.frame=pd.DataFrame(index=_index)
-        self.frame=pd.DataFrame(_index_list,columns=['model','chain','residue','resname'])
-        self.frame['object']=object_list
-    def _object_feature_to_frame(self) -> None:
-        '''
-        '''
-        _init_flag=True
-        for _residue in self.object.get_residues():
-            _res_feats=_residue.xtra
-            if _init_flag:
-                _feature_dicts={key:[] for key in _res_feats.keys()}
-                _init_flag=False
-            for key,value in _res_feats.items():
-                _feature_dicts[key].append(value)
-        
-        for key,value in _feature_dicts.items():
-            self.frame[key]=value
-
-            
-
-
-class DistanceRelyFeatureExtractor(StructFeatureExtractor):
-    '''
-    '''
-    def _produce_tree(self,entity:Entity)->None:
-        pass
-
-    def _distance_between_entity(self,
-    entity1:Entity,entity2:Entity)->Tuple[tuple,tuple,float]:
-        pass
-
 
 class SeqFeatureExtractor:
     '''
@@ -198,9 +186,45 @@ class SeqFeatureExtractor:
         self._produce_feature()
         return self.frame
 
+class ModelFeatureExtractor(StructFeatureExtractor):
+    '''
+    '''
+    def _init_dataframe(self)->None:
+        '''
+        '''
+        _index_list=[]
+        for model in self.object:
+            _index_list.append(model.id)
+        _index=pd.Index(_index_list,name=['model'])
+        self.frame=pd.DataFrame(index=_index)
+
+
+#may be deprecated
+class DistanceRelyFeatureExtractor(StructFeatureExtractor):
+    '''
+    may be deprecated
+    '''
+    def _produce_tree(self,entity:Entity)->None:
+        pass
+
+    def _distance_between_entity(self,
+    entity1:Entity,entity2:Entity)->Tuple[tuple,tuple,float]:
+        pass
+
 class PretrainedFeatureExtractor:
+    '''
+    under development
+    '''
     pass
+
 class BatchProcessor:
+    '''
+    may be deprecated
+    '''
     pass
+
 class DirtyTmpfileFeatureExtractor:
+    '''
+    may be deprecated
+    '''
     pass

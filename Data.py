@@ -1,17 +1,41 @@
 '''
 '''
-from Bio.Data.IUPACData import protein_letters_3to1,protein_letters_1to3
+# from Bio.Data.IUPACData import protein_letters_3to1,protein_letters_1to3
+from Bio.Data import SCOPData
 
 
-amino1to3dict = protein_letters_1to3
+#3-letter code <-> 1-letter code
+amino1to3dict={
+                  'A':'ALA',
+                  'R':'ARG',
+                  'N':'ASN',
+                  'D':'ASP',
+                  'C':'CYS',
+                  'E':'GLU',
+                  'Q':'GLN',
+                  'G':'GLY',
+                  'H':'HIS',
+                  'I':'ILE',
+                  'L':'LEU',
+                  'K':'LYS',
+                  'M':'MET',
+                  'F':'PHE',
+                  'P':'PRO',
+                  'S':'SER',
+                  'T':'THR',
+                  'W':'TRP',
+                  'Y':'TYR',
+                  'V':'VAL'}
 
 amino3to1dict = {
-    **protein_letters_3to1,
+    **SCOPData.protein_letters_3to1,
     **{'ASH': 'A','CYX': 'C','HYP': 'P',
         'HID': 'H','HIE': 'H','HIP':'H','MSE': 'M'}
 }
 
-CDR_annotations = {'imgt':{
+
+#scheme information
+base_CDR_annotations = {'imgt':{
                         'FR1':1,
                         'CDR1':27,
                         'FR2':39,
@@ -20,26 +44,6 @@ CDR_annotations = {'imgt':{
                         'CDR3':105,
                         'FR4':118,
                         'end':130
-                    },
-                    'i':{
-                        'FR1':1,
-                        'CDR1':27,
-                        'FR2':39,
-                        'CDR2':56,
-                        'FR3':66,
-                        'CDR3':105,
-                        'FR4':118,
-                        'end':130
-                    },
-                    'a':{
-                        'FR1':1,
-                        'CDR1':25,
-                        'FR2':41,
-                        'CDR2':58,
-                        'FR3':78,
-                        'CDR3':109,
-                        'FR4':138,
-                        'end':149 
                     },
                     'aho':{
                         'FR1':1,
@@ -50,9 +54,72 @@ CDR_annotations = {'imgt':{
                         'CDR3':109,
                         'FR4':138,
                         'end':149 
-                    }
+                    },
+                    'chothia|H':{
+                        'FR1':1,
+                        'CDR1':26,
+                        'FR2':33,
+                        'CDR2':52,
+                        'FR3':57,
+                        'CDR3':95,
+                        'FR4':103,
+                        'end':113 
+                    },
+                    'chothia|L':{
+                        'FR1':1,
+                        'CDR1':24,
+                        'FR2':35,
+                        'CDR2':50,
+                        'FR3':57,
+                        'CDR3':89,
+                        'FR4':98,
+                        'end':113 
+                    },
+                    'kabat|H':{
+                        'FR1':1,
+                        'CDR1':31,
+                        'FR2':36,
+                        'CDR2':50,
+                        'FR3':66,
+                        'CDR3':95,
+                        'FR4':103,
+                        'end':113 
+                    },
+                    'kabat|L':{
+                        'FR1':1,
+                        'CDR1':24,
+                        'FR2':35,
+                        'CDR2':50,
+                        'FR3':77,
+                        'CDR3':89,
+                        'FR4':98,
+                        'end':107 
+                    },
+                    'kabat|K':{
+                        'FR1':1,
+                        'CDR1':24,
+                        'FR2':35,
+                        'CDR2':50,
+                        'FR3':77,
+                        'CDR3':89,
+                        'FR4':98,
+                        'end':108 
+                    },
              }
 
+CDR_annotations = {
+    **base_CDR_annotations,
+    'a':base_CDR_annotations['aho'],
+    'i':base_CDR_annotations['imgt'],
+    'c|H':base_CDR_annotations['chothia|H'],
+    'c|L':base_CDR_annotations['chothia|L'],
+    'k|H':base_CDR_annotations['kabat|H'],
+    'K|L':base_CDR_annotations['kabat|L'],
+    'k|K':base_CDR_annotations['kabat|K']
+             }
+
+
+#static residue property
 hydrophobicity_scale = {
    'ILE':4.5,
    'VAL':4.2,
@@ -132,26 +199,3 @@ GeorgeDSASA_scale = {
    'ARG':2.560,
 }
 
-
-# GeorgeDSASA = {
-#    'I':1.850,
-#    'V':1.645,
-#    'L':1.931,
-#    'F':2.228,
-#    'C':1.461,
-#    'M':2.034,
-#    'A':1.118,
-#    'G':0.881,
-#    'T':1.525,
-#    'W':2.663,
-#    'S':1.298,
-#    'Y':2.368,
-#    'P':1.468,
-#    'H':2.025,
-#    'E':1.862,
-#    'Q':1.932,
-#    'D':1.587,
-#    'N':1.655,
-#    'K':2.258,
-#    'R':2.560,
-# }

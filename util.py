@@ -15,21 +15,39 @@ more function will to be added will the progression of reconstruction.
 
 
 import Bio.PDB as BP
+import pandas as pd 
 from Bio.PDB.Chain import Chain
 from Bio.PDB.Structure import Structure
 from Bio.PDB.Model import Model
 from Bio.PDB.Entity import Entity
+from Bio.PDB.Residue import Residue
 from Bio.PDB.Atom import Atom
-import pandas as pd 
-from Data import amino3to1dict
-from typing import List,Tuple,Union
 
-def read_in(file:str,id:str='tmp')->Structure:
+from Data import amino3to1dict
+# from distance_util import idstr2tuple
+from typing import List,Tuple,Union,Generator,Iterable,Literal,Dict,Any
+from collections.abc import Iterable as collections_Iterable
+
+# allowd_scheme=Literal['c','chothia','k','kabat','i','imgt','a','aho','m','martin','w','wolfguy']
+allowd_scheme=Literal['c','chothia','k','kabat','i','imgt','a','aho']
+allowed_residue_source=Union[Entity,Iterable[Entity],Atom,Iterable[Atom]]
+STRUCTURE_HOLDER=Structure('place_holder')
+MODEL_HOLDER=Model('place_holder')
+CHAIN_HOLDER=Chain('place_holder')
+RESIDUE_HOLDER=Residue(('place_holder',0,' '),'XXX','')
+MODEL_HOLDER.set_parent(STRUCTURE_HOLDER)
+CHAIN_HOLDER.set_parent(MODEL_HOLDER)
+RESIDUE_HOLDER.set_parent(CHAIN_HOLDER)
+
+def read_in(file:str,id:Union[str,None]=None)->Structure:
     '''
     Parse a PDB file into a Structure object in `PDBParser`'s default mode
     allow an extra parameter `id` for the structure's name. 
     '''
-    return BP.PDBParser(QUIET=True).get_structure(id,file)
+    if isinstance(id,str):
+        return BP.PDBParser(QUIET=True).get_structure(id,file)
+    else:
+        return BP.PDBParser(QUIET=True).get_structure(file,file)
 
 def write_out(strcture:Entity,file:str='tmp.pdb',write_end:bool=True, preserve_atom_numbering:bool=False)->None:
     '''
@@ -71,7 +89,7 @@ def add_chain(segment:Chain,new_id:str,Model:Model)->None:
 
 def to_resid(input:Union[int,str,Tuple[str,int,str]])->Tuple[str,int,str]:
     '''
-    a standard method to convert str, int to standard triplet biopython residue code tuple.
+    a standard method to convert str, int to "standard triplet biopython residue code" tuple.
     return itself if the standard code is give.
     '''
     if isinstance(input,tuple) and len(input)==3:
@@ -85,64 +103,88 @@ def to_resid(input:Union[int,str,Tuple[str,int,str]])->Tuple[str,int,str]:
         except:
             raise TypeError
         
-def idtuple2str(idtuple:Union[Tuple,str,int])->str:
-    '''
-    '''
-    if isinstance(idtuple,tuple):
-        idlist=[str(i) if i != ' ' else '_'  for i in idtuple  ]
-        return '|'.join(idlist)
-    else:
-        return str(idtuple) if idtuple != ' ' else '_'
-    
-def idstr2tuple(idstr:str)->Tuple:
-    '''
-    '''
-    def _(str):
-        try:
-            out=int(str)
-        except ValueError:
-            if str=='_':
-                out=' '
-            else:
-                out=str
-        return out
-    idlist=idstr.split('|')
-    idlist=[_(i) for i in idlist]
-    if len(idlist)>1:
-        return tuple(idlist)
-    elif len(idlist)==1:
-        return idlist[0]
-    else:
-        return ValueError
+def _impute_default_value(object:allowed_residue_source,key:str,default_value:Any)->None:
+    for residue in _integrated_residue_iterator(object):
+        residue.xtra[key]=residue.xtra.get(key,default_value)
 
-def atom_id_from_frame(frame:pd.DataFrame,index:int)->Tuple[int,str,tuple,tuple]:
-    '''
-    '''
-    assert set(['model','chain','residue','atom'])<set(frame.columns),'frame does not contain adequate columns'
-    _id=frame.loc[index][['model','chain','residue','atom']]
-    id=tuple(_id.map(idstr2tuple))
-    return id
 
-def atom_object_from_frame(frame:pd.DataFrame,index:int)->Atom:
+def sequence_from_object(object:Union[Structure,Model],map:dict=amino3to1dict)->Dict[str,str]:
     '''
-    '''
-    assert set(['object'])<set(frame.columns),'frame does not contain adequate columns'
-    object=frame.loc[index]['object']
-    return object
+    only suggested run on Structure & Model instance
+    return a {chainid:aa_seq} dict
 
-def residue_id_from_frame(frame:pd.DataFrame,index:int)->Tuple[int,str,tuple,tuple]:
     '''
-    '''
-    assert set(['model','chain','residue'])<set(frame.columns),'frame does not contain adequate columns'
-    _id=frame.loc[index][['model','chain','residue']]
-    id=tuple(_id.map(idstr2tuple))
-    return id
-
-def get_seq(struct:Structure):
     seq_dict=dict()
-    for chain in struct.get_chains():
-        seq_dict[chain.get_full_id()[1:]]=''.join([i.getresname() for i in chain.get_residues()])
+    for chain in object.get_chains():
+        seq_dict[chain.id]=''.join([map.get(i.get_resname(),'X') for i in chain.get_residues()])
     return seq_dict
+
+def sequence_from_frame(frame:pd.DataFrame,map:dict=amino3to1dict)->Dict[str,str]:
+    '''
+    must run on ResidueFeatureExtractor.object
+
+    '''
+    def list3_to_str1(list3:Iterable[str])->str:
+            return ''.join([map.get(i,'X') for i in list3])
+    _seq_series=frame.groupby('chain')['resname'].apply(list3_to_str1)
+    return dict(_seq_series)
+
+def _integrated_residue_iterator(object:allowed_residue_source)->Generator[Residue,None,None]:
+    '''
+    iterate the Residue instance in Entity, Atom(return its parent in this case ),
+        AND anything iterable composed of these two kind of instance
+    '''
+    if isinstance(object,Entity) and object.level!='R':
+        yield from object.get_residues()
+    elif isinstance(object,Entity) and object.level=='R':
+        yield from [object]
+    elif isinstance(object,Atom):
+        yield from [object.get_parent()]
+    elif isinstance(object,collections_Iterable):
+        for i in object:
+            yield from _integrated_residue_iterator(i)
+    else:
+        raise TypeError
+
+def _integrated_atom_iterator(object:Union[Entity,Iterable[Entity],Atom,Iterable[Atom]])->Generator[Atom,None,None]:
+    '''
+        iterate the Atom instance in Entity, Atom(return their parent in this case ),
+        AND anything iterable composed of these two kind of instance
+    '''
+    if isinstance(object,Entity):
+        yield from object.get_atoms()
+    elif isinstance(object,Atom):
+        yield from [object]
+    elif isinstance(object,collections_Iterable):
+        for i in object:
+            yield from _integrated_atom_iterator(i)
+    else:
+        raise TypeError
+
+def _list_feature_into_residue(feature_list:Iterable,key:str,object:allowed_residue_source):
+    '''
+    suggest to use in some feature imputer.
+    when the previous operation would produce a feature list(must be list),
+    use this function to put these feature in object's Residues.
+    '''
+    i=0
+    for residue in _integrated_residue_iterator(object):
+        residue.xtra[key]=feature_list[i]
+        i+=1
+    if i!=len(feature_list):
+        raise ValueError
+    
+def _list_feature_into_frame(feature_list:Iterable,key:str,frame:pd.DataFrame):
+    '''
+    suggest to use in some feature imputer.
+    when the previous operation would produce a feature list(must be list),
+    use this function to put these feature into the frame 
+    commonly the ResidueFeatureExtractor.object)
+    '''
+    if len(frame)!=len(feature_list):
+        raise ValueError
+    else:
+        frame[key]=feature_list
 
 
 #test code
