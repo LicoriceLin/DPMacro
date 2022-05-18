@@ -1,14 +1,18 @@
+'''
+useful tools involving spacial calculation.
+'''
+
 from Bio.PDB.Structure import Structure
 from Bio.PDB.Entity import Entity
 from typing import List,Tuple,Union,Dict
-import typing
+# import typing
 from Bio.PDB.Atom import Atom
 from Bio.PDB.kdtrees import KDTree
 import numpy as np
 import pandas as pd
-from util import _integrated_atom_iterator,allowed_residue_source
-import warnings
-from Bio import BiopythonParserWarning
+from util import integrated_residue_iterator,allowed_residue_source
+# import warnings
+# from Bio import BiopythonParserWarning
 
 
 
@@ -18,15 +22,19 @@ from Bio import BiopythonParserWarning
 
 def produce_tree(object:allowed_residue_source)->Tuple[pd.DataFrame,KDTree]:
     '''
-    same function with `produce tree`.
-    but use the `_integrated_residue_iterator`.
-    warning:untested.
+    yield the basic instance for distance calculation.
+    output[0]: a dataframe:
+        'model','chain','residue','atom','resname':atom information;
+        'x','y','z': coordinates;
+        'object': Atom instance. extact the same instance as Atoms in input.
+    output[1]: a kdtree object implemented in biopython 1.79+.
+        use `from Bio.PDB.kdtrees import KDTree ; help(KDTree) ` to see the detail.
     '''
     _atom_index_list=[]
     _atom_coord_list=[]
     _atom_resname_list=[]
     _atom_list=[]
-    for atom in _integrated_atom_iterator(object):
+    for atom in integrated_residue_iterator(object):
         _full_id=atom.get_full_id()[1:]
         _atom_index_list.append([idtuple2str(i) for i in _full_id])
         _atom_coord_list.append(atom.coord)
@@ -48,6 +56,9 @@ def produce_tree(object:allowed_residue_source)->Tuple[pd.DataFrame,KDTree]:
 def distance_between_entity(
         entity1:Union[Entity,List[Entity]],entity2:Union[Entity,List[Entity]])->Tuple[Atom,Atom,float]:
     '''
+    the closest distance between 2 atom sets.
+    return[0] / return[1] : the closest Atom instance in entity1 & entity2.
+    return[2] : the distance.
     '''
     frame1,tree1=produce_tree(entity1)
     frame2,tree2=produce_tree(entity2)
@@ -79,7 +90,7 @@ def atom_within_threshold(
         entity1:Union[Entity,List[Entity]],entity2:Union[Entity,List[Entity]],threshold:float)->Dict[Atom,float]:
     '''
     search entity1, 
-    return {atom within the threshold of entity2:closest distance}
+    return {Atom instance within the threshold of entity2:the distance}
     '''
     frame1,tree1=produce_tree(entity1)
     frame2,tree2=produce_tree(entity2)
@@ -92,15 +103,34 @@ def atom_within_threshold(
     return outputdict
 
 def residue_distance_matrix(object:allowed_residue_source)->pd.Series:
+    '''
+    return a residue-wise closest distance matrix from the input Atom set.
+    note: if only part of a residue's atom is included in the input, clalulation will consider only these atoms.   
+
+    '''
     frame=produce_tree(object)[0][['object','x','y','z']]
     frame['residue']=frame['object'].apply(Atom.get_parent)
     cross_frame=get_distance(frame,frame)
     distances = cross_frame.groupby(['residue_1','residue_2'])['distance'].min()
     return distances
 
+def residue_distance_matrix(object:allowed_residue_source)->pd.Series:
+    '''
+    return a atom-wise closest distance matrix from the input Atom set.
+
+    '''
+    frame=produce_tree(object)[0][['object','x','y','z']]
+    frame.columns=['atom','x','y','z']
+    # frame['residue']=frame['object'].apply(Atom.get_parent)
+    cross_frame=get_distance(frame,frame)
+    distances = cross_frame['distance']
+    distances.index=pd.Index(cross_frame[['atom_1','atom_2']])
+    return distances
+
 #small tools
 def idtuple2str(idtuple:Union[Tuple,str,int])->str:
     '''
+    (deprecated)
     turn "standard triplet biopython residue code" to a single string linked by "|"
     '''
     if isinstance(idtuple,tuple):
@@ -111,6 +141,7 @@ def idtuple2str(idtuple:Union[Tuple,str,int])->str:
     
 def idstr2tuple(idstr:str)->Tuple:
     '''
+    (deprecated)
     turn  a single string linked by "|" to "standard triplet biopython residue code"
     '''
     def _(str):
@@ -133,6 +164,7 @@ def idstr2tuple(idstr:str)->Tuple:
 
 def atom_id_from_frame(frame:pd.DataFrame,index:int)->Tuple[int,str,tuple,tuple]:
     '''
+    (deprecated)
     used in produce_tree's dataframe.
     extract the Atom's full_id from this dataframe.
     '''
@@ -143,6 +175,7 @@ def atom_id_from_frame(frame:pd.DataFrame,index:int)->Tuple[int,str,tuple,tuple]
 
 def atom_object_from_frame(frame:pd.DataFrame,index:int)->Atom:
     '''
+    (actually in use )
     used in produce_tree's dataframe.
     extract the Atom object from dataframe.
     '''
@@ -152,6 +185,7 @@ def atom_object_from_frame(frame:pd.DataFrame,index:int)->Atom:
 
 def residue_id_from_frame(frame:pd.DataFrame,index:int)->Tuple[int,str,tuple,tuple]:
     '''
+    (deprecated)
     used in produce_tree's dataframe.
     extract the Atom.get_parent()'s full_id, where the Atom's index in the dataframe ( and the tree) is given.
     '''
@@ -162,10 +196,16 @@ def residue_id_from_frame(frame:pd.DataFrame,index:int)->Tuple[int,str,tuple,tup
 
 def _euclid_dis(x1:float,y1:float,z1:float,x2:float,y2:float,z2:float)->float:
     '''
+    calculate the spacial distance.
     '''
     return  ((x1-x2)**2+(y1-y2)**2+(z1-z2)**2)**0.5
 
-def get_distance(res1:pd.DataFrame,res2:pd.DataFrame)->float:
+def get_distance(res1:pd.DataFrame,res2:pd.DataFrame)->pd.DataFrame:
+    '''
+    input:2 dataframes from produce_tree
+    return a distance matrix, containing all distance between atoms in res1 and res2.
+    use return[(return['object_1']==Atom1) & (return['object_2']==Atom2)]['distance'] to get distance between Atom1 in frame1 and Atom2 in frame2
+    '''
     dis=pd.merge(res1,res2,how='cross',suffixes=('_1','_2'))
     dis['distance']=((dis['x_1']-dis['x_2'])**2
         +(dis['y_1']-dis['y_2'])**2
@@ -176,6 +216,8 @@ def get_distance(res1:pd.DataFrame,res2:pd.DataFrame)->float:
 #deprecate functions
 def unintegrate_produce_tree(entity:Union[Entity,Atom,List[Entity],List[Atom]])->Tuple[pd.DataFrame,KDTree]:
     '''
+    (deprecated)
+    olde version of produce_tree
     '''
     _atom_index_list=[]
     _atom_coord_list=[]
@@ -233,7 +275,8 @@ def unintegrate_produce_tree(entity:Union[Entity,Atom,List[Entity],List[Atom]])-
 def frame_distance_between_entity(
         entity1:Union[Entity,List[Entity]],entity2:Union[Entity,List[Entity]])->Tuple[Tuple,Tuple,float]:
     '''
-    much slower
+    (deprecated)
+    slow version of `distance_between_entity`
     '''
     frame1,tree1=produce_tree(entity1)
     frame2,tree2=produce_tree(entity2)
@@ -249,6 +292,10 @@ def frame_distance_between_entity(
     return id1,id2,distance
 
 def tree_distance_matrix(struct:Structure)->pd.DataFrame:
+    '''
+    (deprecated)
+    slow version of `distance_matrix`
+    '''
     # if len(object.child_list)>1:
     #     warnings.warn("multi-frame object detected."
     #          "only frame 0 will be processed.",
@@ -264,6 +311,8 @@ def tree_distance_matrix(struct:Structure)->pd.DataFrame:
     dis_frame=pd.DataFrame(dis_matrix,index=index,columns=index)
     return dis_frame
 
+
+#need update
 if __name__ == '__main__':
     import sys
     from util import read_in

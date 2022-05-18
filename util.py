@@ -1,15 +1,5 @@
 '''
-some useful stand-alone tools
-
-cmds for condes validation:
-python utils arg1 arg2
-arg1 : path of the pdb testcase
-arg2 : the chain to run extract_hetatm on 
-
-the output will be like: 
-the arg2 chain's hetatms will be renamed to chain Z and put behind all other chains.
-
-more function will to be added will the progression of reconstruction.
+some useful recurrent codes
 
 '''
 
@@ -35,14 +25,16 @@ STRUCTURE_HOLDER=Structure('place_holder')
 MODEL_HOLDER=Model('place_holder')
 CHAIN_HOLDER=Chain('place_holder')
 RESIDUE_HOLDER=Residue(('place_holder',0,' '),'XXX','')
-MODEL_HOLDER.set_parent(STRUCTURE_HOLDER)
-CHAIN_HOLDER.set_parent(MODEL_HOLDER)
-RESIDUE_HOLDER.set_parent(CHAIN_HOLDER)
+#set_parent has some unknown bug. use .add instead. 
+STRUCTURE_HOLDER.add(MODEL_HOLDER)
+MODEL_HOLDER.add(CHAIN_HOLDER)
+CHAIN_HOLDER.add(RESIDUE_HOLDER)
 
 def read_in(file:str,id:Union[str,None]=None)->Structure:
     '''
-    Parse a PDB file into a Structure object in `PDBParser`'s default mode
-    allow an extra parameter `id` for the structure's name. 
+    read in a pdb file,return a Structure object
+    id:the id of output Structure. Use path str as the Structure.id if id=None
+
     '''
     if isinstance(id,str):
         return BP.PDBParser(QUIET=True).get_structure(id,file)
@@ -54,6 +46,7 @@ def write_out(strcture:Entity,file:str='tmp.pdb',write_end:bool=True, preserve_a
     write out an Entity (from the whole structure to a single atom) to pdb file.
     use the `write_end` to write an END line, 
     the `preserve_atom_numbering` to renumber atom from 1.
+    will be compatible with all `allowed_residue_source` in the future
     '''
     io = BP.PDBIO()
     io.set_structure(strcture)
@@ -89,7 +82,7 @@ def add_chain(segment:Chain,new_id:str,Model:Model)->None:
 
 def to_resid(input:Union[int,str,Tuple[str,int,str]])->Tuple[str,int,str]:
     '''
-    a standard method to convert str, int to "standard triplet biopython residue code" tuple.
+    a standard method to convert str/int to "standard triplet biopython residue code" tuple.
     return itself if the standard code is give.
     '''
     if isinstance(input,tuple) and len(input)==3:
@@ -103,15 +96,19 @@ def to_resid(input:Union[int,str,Tuple[str,int,str]])->Tuple[str,int,str]:
         except:
             raise TypeError
         
-def _impute_default_value(object:allowed_residue_source,key:str,default_value:Any)->None:
-    for residue in _integrated_residue_iterator(object):
+def impute_default_value(object:allowed_residue_source,key:str,default_value:Any)->None:
+    '''
+    used when not all Residue in `object` has a key of `key` in its .xtra dict.
+    impute the given default value into this entry. 
+    '''
+    for residue in integrated_residue_iterator(object):
         residue.xtra[key]=residue.xtra.get(key,default_value)
 
 
 def sequence_from_object(object:Union[Structure,Model],map:dict=amino3to1dict)->Dict[str,str]:
     '''
     only suggested run on Structure & Model instance
-    return a {chainid:aa_seq} dict
+    return a {chainid:aa_seq} dict by map residue's `resname` property in map dict
 
     '''
     seq_dict=dict()
@@ -121,7 +118,7 @@ def sequence_from_object(object:Union[Structure,Model],map:dict=amino3to1dict)->
 
 def sequence_from_frame(frame:pd.DataFrame,map:dict=amino3to1dict)->Dict[str,str]:
     '''
-    must run on ResidueFeatureExtractor.object
+    must run on ResidueFeatureExtractor.frame properety
 
     '''
     def list3_to_str1(list3:Iterable[str])->str:
@@ -129,10 +126,10 @@ def sequence_from_frame(frame:pd.DataFrame,map:dict=amino3to1dict)->Dict[str,str
     _seq_series=frame.groupby('chain')['resname'].apply(list3_to_str1)
     return dict(_seq_series)
 
-def _integrated_residue_iterator(object:allowed_residue_source)->Generator[Residue,None,None]:
+def integrated_residue_iterator(object:allowed_residue_source)->Generator[Residue,None,None]:
     '''
     iterate the Residue instance in Entity, Atom(return its parent in this case ),
-        AND anything iterable composed of these two kind of instance
+    AND anything iterable composed of these two kind of instance
     '''
     if isinstance(object,Entity) and object.level!='R':
         yield from object.get_residues()
@@ -142,14 +139,14 @@ def _integrated_residue_iterator(object:allowed_residue_source)->Generator[Resid
         yield from [object.get_parent()]
     elif isinstance(object,collections_Iterable):
         for i in object:
-            yield from _integrated_residue_iterator(i)
+            yield from integrated_residue_iterator(i)
     else:
         raise TypeError
 
-def _integrated_atom_iterator(object:Union[Entity,Iterable[Entity],Atom,Iterable[Atom]])->Generator[Atom,None,None]:
+def integrated_atom_iterator(object:Union[Entity,Iterable[Entity],Atom,Iterable[Atom]])->Generator[Atom,None,None]:
     '''
-        iterate the Atom instance in Entity, Atom(return their parent in this case ),
-        AND anything iterable composed of these two kind of instance
+    iterate the Atom instance in Entity, Atom(return their parent in this case ),
+    AND anything iterable composed of these two kind of instance
     '''
     if isinstance(object,Entity):
         yield from object.get_atoms()
@@ -157,7 +154,7 @@ def _integrated_atom_iterator(object:Union[Entity,Iterable[Entity],Atom,Iterable
         yield from [object]
     elif isinstance(object,collections_Iterable):
         for i in object:
-            yield from _integrated_atom_iterator(i)
+            yield from integrated_atom_iterator(i)
     else:
         raise TypeError
 
@@ -168,7 +165,7 @@ def _list_feature_into_residue(feature_list:Iterable,key:str,object:allowed_resi
     use this function to put these feature in object's Residues.
     '''
     i=0
-    for residue in _integrated_residue_iterator(object):
+    for residue in integrated_residue_iterator(object):
         residue.xtra[key]=feature_list[i]
         i+=1
     if i!=len(feature_list):
@@ -188,6 +185,7 @@ def _list_feature_into_frame(feature_list:Iterable,key:str,frame:pd.DataFrame):
 
 
 #test code
+#need to be update
 if __name__ == '__main__':
     import sys
     test_path=sys.argv[1]

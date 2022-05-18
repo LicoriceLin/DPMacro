@@ -1,4 +1,6 @@
 '''
+library of constant,
+
 '''
 # from Bio.Data.IUPACData import protein_letters_3to1,protein_letters_1to3
 from Bio.Data import SCOPData
@@ -111,8 +113,10 @@ CDR_annotations = {
     **base_CDR_annotations,
     'a':base_CDR_annotations['aho'],
     'i':base_CDR_annotations['imgt'],
+    'chothia|K':base_CDR_annotations['chothia|L'],
     'c|H':base_CDR_annotations['chothia|H'],
     'c|L':base_CDR_annotations['chothia|L'],
+    'c|K':base_CDR_annotations['chothia|L'],
     'k|H':base_CDR_annotations['kabat|H'],
     'K|L':base_CDR_annotations['kabat|L'],
     'k|K':base_CDR_annotations['kabat|K']

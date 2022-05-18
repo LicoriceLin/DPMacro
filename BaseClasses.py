@@ -1,3 +1,10 @@
+'''
+BaseClasses
+maintains interfaces and shared method.
+        '''
+
+
+
 from Bio.PDB.StructureBuilder import StructureBuilder
 # from Bio.Data import SCOPData
 # from Bio.PDB.Chain import Chain
@@ -7,17 +14,45 @@ import pandas as pd
 # import numpy as np
 from typing import Union,Tuple,Dict,Iterable
 from util import read_in,extract_hetatm,sequence_from_frame
-from util import _list_feature_into_residue,_list_feature_into_frame,_integrated_residue_iterator
+from util import _list_feature_into_residue,_list_feature_into_frame,integrated_residue_iterator
 from util import allowed_residue_source,allowd_scheme,RESIDUE_HOLDER
 from Data import amino3to1dict
 
 class StructFeatureExtractor:
     '''
     parent of Model/Chain/ResidueFeatureExtractor
-    but the first 2 haven't been used yet.  
+    but the first 2 haven't been implemented yet.  
+
+    public property:
+    self.object
+        Bio.Structure instance.
+        some quick guide:
+            1. In Bio. pdb information is maintained hierarchical in `Structure`(like Universe in mdanalyse), `Model`(frame), Chain, Residue and Atom. they are all subclass of `Entity` except for Atom.
+            2. Entity is Iterable. e.g. 
+                Structure[0] returns the first frame in the pdb file; 
+                Model['A'] returns chain A in the frame; 
+                Chain[10] or Chain[(' ',107,'A')](use the latter to get residue with insertion-code) returns a Residue
+                Residue['CB'] returns a Atom.
+            3. Both Entity and Atom are Hashable.
+            4.I use a dict, Entity/Atom.xtra to save features in the structure in the object.
+            See More in the Biopython Tutorial.
+        
+    self.frame
+        pd.DataFrame object.
+        See more in subclasses of StructFeatureExtractor
+
+    self.operation_name:
+        a str to display ( and maybe hash, in the future) this extractor instance.
+
+    method:
+        see docstring of each method.
+
     '''
     def __init__(self,operation_name:str='',canonical_only:bool=True)->None:
         '''
+        set the name of your Extractor
+        decide the parameters for transform. 
+        (e.g. if solvent and ligand will be maintained in the structure) 
         '''
         self.operation_name=operation_name
         self._canonical_only=canonical_only
@@ -27,6 +62,8 @@ class StructFeatureExtractor:
 
     def __repr__(self):
         '''
+        show Extractor instance in following manner:
+        <Extractor : {self.operation_name} : {struct_id_} : ', '.join(list(self.frame.columns))>
         '''
         if hasattr(self,'object'):
             struct_id_=self.object.id
@@ -40,6 +77,7 @@ class StructFeatureExtractor:
     
     def _set_structure(self,struct:Union[str,Structure])->None:
         '''
+        see `transform(self)`
         '''
         if isinstance(struct,str):
             self.object=read_in(struct,struct)
@@ -52,22 +90,34 @@ class StructFeatureExtractor:
         
     def _remove_hetatm(self)->None:
         '''
+        delete all the ligand and solvent in self.object. 
+        warning: untest in ncaa systems.
+
         '''
         for _chain in self.object.get_chains():
             extract_hetatm(_chain,inplace=True)
 
     def _init_dataframe(self)->None:
         '''
+         (they are just interface to be implemented in subclass.)
+        see their expected behavior in `transform(self)`
         '''
         raise NotImplementedError
 
     def _produce_feature(self)->None:
         '''
+        (interface to be implemented in subclass.)
+        see their expected behavior in `transform(self)`
         '''
         pass
 
     def transform(self,struct:Union[str,Structure])->pd.DataFrame:
         '''
+        1.set the input structure( both Bio.Structure object and path to pdb file is allowed) to self.object
+        2.do some simple pre-process( e.g. remove hetatm, split Fv domain)
+        3.init self.frame as a dataframe containing all entity with feature( e.g. a frame in which each row points to a residue )
+        4.produce the feature by private method `_produce_feature`, note all the parameter for this method should be defined during `__init__` of the instance.
+        5.return self.frame. contains entity and their features.
         '''
         self._set_structure(struct)
         self._init_dataframe()
@@ -76,19 +126,26 @@ class StructFeatureExtractor:
 
     def _object_feature_to_frame(self)->None:
         '''
+        (interface to be implemented in subclass.)
         the structure can carry features in its`.xtra` property,
         use this method to put them into the frame.
+        refresh self.frame by pull features from self.object.
+        note: supposed to work in an `append new and overwrite old` manner 
         '''
         raise NotImplementedError
 
     def _frame_feature_to_object(self)->None:
         '''
+        (interface to be implemented in subclass.)
         reverse to `_object_feature_to_frame`
+        refresh self.object by pull features from self.frame.
+        note: supposed to work in an `append new and overwrite old` manner 
         '''
         raise NotImplementedError
                 
     def get_feature(self)->pd.Series:
         '''
+        may be deprecated soon
         the MultiIndex of pandas may be too tricky.
         I'm trying to wrap it into a more convenient manner  
         '''
@@ -96,9 +153,21 @@ class StructFeatureExtractor:
 
 class ResidueFeatureExtractor(StructFeatureExtractor):
     '''
+    subclass of StructFeatureExtractor.
+    used to process Residue-level features, 
+    and reduce them to Chain/Model level
     ''' 
     def _init_dataframe(self)->None:
         '''
+        note the format in ResidueFeatureExtractor.frame
+
+        a fresh initiated self.frame contains 5 columns:
+            model: model id for each residue;
+            chain: chain id for each residue;
+            residue: residue `full id`(a trimer tuple, see biopython tutorial for detail) for each residue;
+            resname: residue's full name (three letter, all capital)
+            object: the Residue object itself. 
+                !!it is the SAME instance as Residue in self.object.
         '''
         _index_list=[]
         object_list=[]
@@ -113,6 +182,7 @@ class ResidueFeatureExtractor(StructFeatureExtractor):
 
     def _object_feature_to_frame(self) -> None:
         '''
+        see parent.
         '''
         _init_flag=True
         for _residue in self.object.get_residues():
@@ -131,14 +201,22 @@ class ResidueFeatureExtractor(StructFeatureExtractor):
         #     return ''.join([map.get(i,'X') for i in list3])
         # _seq_series=self.frame.groupby('chain')['resname'].apply(list3_to_str1)
         # self.sequences=dict(_seq_series)
+        '''
+        initiate a {chain:fastaseq} dict in self.sequences by running util.sequence_from_frame
+        '''
         self.sequences=sequence_from_frame(self.frame,map)
 
     def _reduce(self):
         '''
+        (interface for rewrite in its subclass.)
         reduce Residue property to Chain-level or Model-level property
+        expected behavior:
+        deal with the self.frame.groupby(...) object.
+        return a chain or model level feature frame.
         '''
         raise NotImplementedError
-#unused
+
+#unimplemented
 class ChainFeatureExtractor(StructFeatureExtractor):  
     '''
     ''' 
@@ -164,6 +242,9 @@ class ChainFeatureExtractor(StructFeatureExtractor):
 
 class SeqFeatureExtractor:
     '''
+    under early construction.
+    share similar behavior with StructFeatureExtractor;
+    but use a sequence str as input.
     '''
     def __init__(self):
         pass
@@ -200,31 +281,31 @@ class ModelFeatureExtractor(StructFeatureExtractor):
 
 
 #may be deprecated
-class DistanceRelyFeatureExtractor(StructFeatureExtractor):
-    '''
-    may be deprecated
-    '''
-    def _produce_tree(self,entity:Entity)->None:
-        pass
+# class DistanceRelyFeatureExtractor(StructFeatureExtractor):
+#     '''
+#     may be deprecated
+#     '''
+#     def _produce_tree(self,entity:Entity)->None:
+#         pass
 
-    def _distance_between_entity(self,
-    entity1:Entity,entity2:Entity)->Tuple[tuple,tuple,float]:
-        pass
+#     def _distance_between_entity(self,
+#     entity1:Entity,entity2:Entity)->Tuple[tuple,tuple,float]:
+#         pass
 
-class PretrainedFeatureExtractor:
-    '''
-    under development
-    '''
-    pass
+# class PretrainedFeatureExtractor:
+#     '''
+#     under development
+#     '''
+#     pass
 
-class BatchProcessor:
-    '''
-    may be deprecated
-    '''
-    pass
+# class BatchProcessor:
+#     '''
+#     may be deprecated
+#     '''
+#     pass
 
-class DirtyTmpfileFeatureExtractor:
-    '''
-    may be deprecated
-    '''
-    pass
+# class DirtyTmpfileFeatureExtractor:
+#     '''
+#     may be deprecated
+#     '''
+#     pass
