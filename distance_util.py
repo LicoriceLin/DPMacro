@@ -4,13 +4,14 @@ useful tools involving spacial calculation.
 
 from Bio.PDB.Structure import Structure
 from Bio.PDB.Entity import Entity
+from Bio.PDB.Residue import Residue
 from typing import List,Tuple,Union,Dict
 # import typing
 from Bio.PDB.Atom import Atom
 from Bio.PDB.kdtrees import KDTree
 import numpy as np
 import pandas as pd
-from util import integrated_residue_iterator,allowed_residue_source
+from util import integrated_residue_iterator,integrated_atom_iterator,allowed_residue_source
 # import warnings
 # from Bio import BiopythonParserWarning
 
@@ -34,7 +35,7 @@ def produce_tree(object:allowed_residue_source)->Tuple[pd.DataFrame,KDTree]:
     _atom_coord_list=[]
     _atom_resname_list=[]
     _atom_list=[]
-    for atom in integrated_residue_iterator(object):
+    for atom in integrated_atom_iterator(object):
         _full_id=atom.get_full_id()[1:]
         _atom_index_list.append([idtuple2str(i) for i in _full_id])
         _atom_coord_list.append(atom.coord)
@@ -102,9 +103,19 @@ def atom_within_threshold(
     outputdict={atom_object_from_frame(frame1,key):value for key,value in _outputdict.items()}
     return outputdict
 
+def residue_within_threshold(entity1:allowed_residue_source,entity2:allowed_residue_source,threshold)->List[Residue]:
+    '''
+    return a non-redundant list of Residue in entity1 within distance threshold of entity2.
+    Note:only search atom in entity1, get atom within threshold,
+        and then get their parent in a deduplicated list.
+    '''
+    return list(set(integrated_residue_iterator(
+                            atom_within_threshold(entity1,entity2,threshold).keys())))
+
 def residue_distance_matrix(object:allowed_residue_source)->pd.Series:
     '''
     return a residue-wise closest distance matrix from the input Atom set.
+    use output[Residue1,Residue2] to get the distance
     note: if only part of a residue's atom is included in the input, clalulation will consider only these atoms.   
 
     '''
@@ -114,9 +125,10 @@ def residue_distance_matrix(object:allowed_residue_source)->pd.Series:
     distances = cross_frame.groupby(['residue_1','residue_2'])['distance'].min()
     return distances
 
-def residue_distance_matrix(object:allowed_residue_source)->pd.Series:
+def atom_distance_matrix(object:allowed_residue_source)->pd.Series:
     '''
     return a atom-wise closest distance matrix from the input Atom set.
+    use output[Atom1,Atom2] to get the distance between Atom1&2
 
     '''
     frame=produce_tree(object)[0][['object','x','y','z']]

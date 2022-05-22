@@ -29,6 +29,13 @@ amino1to3dict={
                   'Y':'TYR',
                   'V':'VAL'}
 
+nucleic_acid_dict = {
+    'A':'A',
+    'C':'C',
+    'G':'G',
+    'U':'U',
+    'T':'T'
+}
 amino3to1dict = {
     **SCOPData.protein_letters_3to1,
     **{'ASH': 'A','CYX': 'C','HYP': 'P',
