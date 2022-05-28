@@ -13,7 +13,7 @@ import pandas as pd
 
 # from Bio.PDB.Structure import Structure
 from Bio.PDB.Entity import Entity
-from Bio.PDB.Atom import Atom
+# from Bio.PDB.Atom import Atom
 from Bio.PDB.Chain import Chain
 from Bio.PDB.StructureBuilder import StructureBuilder
 
@@ -129,50 +129,7 @@ def impute_cdr(object:allowed_residue_source,scheme:allowd_scheme='a')->None:
         elif i.xtra['anarci_order'][1]>annotation['FR4'] and i.xtra['anarci_order'][1]<=annotation['end']:
             i.xtra['CDR']='FW4'
 
-def impute_vicinity(object:allowed_residue_source)->None:
-    '''
-    must run after `impute_CDR`
-    need to be fixed.
-    '''
-    fw_heavy_list=[]
-    vicinity_list=[]
-    for residue in integrated_residue_iterator(object):
-        #impute left /right anchor of CDR as vicinity 
-        #and get list of CDR / framework_ca separately
 
-        # if 'CDR' in residue.xtra['CDR']:
-        #     residue.xtra['vicinity']=1
-        #     if 'FW' in last_residue.xtra.get('CDR','X'):
-        #         last_residue.xtra['vicinity']=1
-        #         vicinity_list.append(last_residue)
-        #     vicinity_list.append(residue)            
-        # elif 'FW' in residue.xtra['CDR']:
-        #     fw_heavy_list.extend([atom for atom in residue.get_atoms() if atom.element != 'H'])
-        #     if 'CDR' in last_residue.xtra.get('CDR','X'):
-        #         residue.xtra['vicinity']=1
-        #         vicinity_list.append(residue) 
-        #     else:
-        #         residue.xtra['vicinity']=0
-        # else:
-        #     residue.xtra['vicinity']=0
-        
-        if 'FW' in residue.xtra['CDR']:
-            fw_heavy_list.extend([atom for atom in residue.get_atoms() if atom.element != 'H'])
-        elif 'AC' in residue.xtra['CDR'] or 'CDR' in residue.xtra['CDR']:
-            vicinity_list.append(residue)
-    
-    vicinity_heavy_dict=du.atom_within_threshold(fw_heavy_list,vicinity_list,4.5)
-
-    plus_vicinity_list=pd.Series(vicinity_heavy_dict.keys()).apply(Atom.get_parent).value_counts().index.to_list()
-    vicinity_list.extend(plus_vicinity_list)
-    # atom:Atom=Atom() -> a placeholder for pylance 
-    for residue in integrated_residue_iterator(object):
-        if residue in vicinity_list:
-            residue.xtra['vicinity']=1
-        else:
-            residue.xtra['vicinity']=0
-    
-    return vicinity_list
 
 class hmt_FvProcessor(ResidueFeatureExtractor):
     def __init__(self, scheme:allowd_scheme) -> None:

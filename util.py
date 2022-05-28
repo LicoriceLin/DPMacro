@@ -4,7 +4,7 @@ some useful recurrent codes
 '''
 
 
-import imp
+# import imp
 import Bio.PDB as BP
 import pandas as pd 
 import re
@@ -17,7 +17,7 @@ from Bio.PDB.Atom import Atom
 import numpy as np
 from Data import amino3to1dict
 # from distance_util import idstr2tuple
-from typing import List,Tuple,Union,Generator,Iterable,Literal,Dict,Any
+from typing import List,Tuple,Union,Generator,Iterable,Literal,Dict,Any,Callable
 from collections.abc import Iterable as collections_Iterable
 
 # allowd_scheme=Literal['c','chothia','k','kabat','i','imgt','a','aho','m','martin','w','wolfguy']
@@ -55,6 +55,13 @@ def write_out(strcture:Entity,file:str='tmp.pdb',write_end:bool=True, preserve_a
     io = BP.PDBIO()
     io.set_structure(strcture)
     io.save(file,write_end=write_end,preserve_atom_numbering=preserve_atom_numbering)
+
+def impute_beta(object:allowed_residue_source,func:Callable[[Residue], float]):
+    '''
+    func needs a Residue as input, a float as output
+    '''
+    for atom in integrated_atom_iterator(object):
+        atom.bfactor=func(atom.get_parent())
 
 def extract_hetatm(input:Chain,inplace:bool=False)->List[Chain]:  
     '''

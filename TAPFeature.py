@@ -2,29 +2,32 @@
 function and class to calculate TAP related functions.
 '''
 # from pandas import DataFrame
-import distance_util as du
 import pandas as pd
 import numpy as np
-from BaseClasses import ResidueFeatureExtractor,SeqFeatureExtractor
+
 # from Bio.PDB.Entity import Entity
 # from Bio.PDB.Structure import Structure
-# from Bio.PDB.Residue import Residue
-# from Bio.PDB.Atom import Atom
-from Data import *
+from Bio import BiopythonParserWarning
+from Bio.PDB.Residue import Residue
+from Bio.PDB.Atom import Atom
+from Bio.PDB import ShrakeRupley
 
 from typing import Iterable
 
-from Bio import BiopythonParserWarning
+from BaseClasses import ResidueFeatureExtractor,SeqFeatureExtractor
+import distance_util as du
 from util import integrated_residue_iterator,allowed_residue_source,allowd_scheme,impute_default_value
+from util import RESIDUE_HOLDER
+from Data import *
 from distance_util import residue_distance_matrix
-from CdrAnnotator import run_anarci,impute_cdr,impute_vicinity
-from BiopyInternalFeature import impute_sasa
+from CdrAnnotator import run_anarci,impute_cdr
+from BiopyInternalFeature import impute_sasa,impute_dssp
 import warnings
 
 
 
 
-def impute_static_feature_struct(object:allowed_residue_source):
+def impute_static_feature(object:allowed_residue_source):
     '''
     impute these feature in input's Residue.xtra dict:
     'hydrophobicity','static_charge','i_sasa','georged_i_sasa'
@@ -77,7 +80,7 @@ def impute_salted_charge_n_hydro(object:allowed_residue_source):
         residue.xtra['salted_charge'] = residue.xtra['static_charge'] if not residue.xtra['salt_bridge'] else 0
         residue.xtra['salted_hydrophobicity'] = residue.xtra['hydrophobicity'] if not residue.xtra['salt_bridge'] else hydrophobicity_scale['GLY']
 
-def impute_fsasa(object:allowed_residue_source):
+def impute_fsasa(object:allowed_residue_source,sasa_key='SASA_INTERNAL'):
     '''
     fsasa serves as a criteria to define if a residue is surfacial in TAP.
     it is a valuable feature for downstream task. 
@@ -86,10 +89,10 @@ def impute_fsasa(object:allowed_residue_source):
     by calculating 0.01*residue.xtra['SASA_INTERNAL']/residue.xtra['i_sasa'].
 
     Note:
-    must run after `_impute_static_feature_struct` and `_impute_sasa` 
+    must run after `impute_static_feature_struct` and `impute_sasa` 
     '''
     for residue in integrated_residue_iterator(object):
-        residue.xtra['f_sasa']=0.01*residue.xtra['SASA_INTERNAL']/residue.xtra['i_sasa']
+        residue.xtra['f_sasa']=0.01*residue.xtra[sasa_key]/residue.xtra['i_sasa']
 
 def impute_psh_like_feature(distance_matrix:pd.Series,input_key:str,output_key:str,func=lambda x:x,threshhold:float=7.5)->None:
     '''
@@ -108,8 +111,8 @@ def impute_psh_like_feature(distance_matrix:pd.Series,input_key:str,output_key:s
                 value=func(row[0][0].xtra[input_key])*func(row[0][1].xtra[input_key])/row[1]**2 if row[1]<threshhold else 0
             else:
                 value=func(row[0][0].xtra[input_key])*func(row[0][1].xtra[input_key])/row[1]**2
-        row[0][0].xtra[output_key]=row[0][0].xtra.get(output_key,0)+value/4
-        row[0][1].xtra[output_key]=row[0][1].xtra.get(output_key,0)+value/4
+        row[0][0].xtra[output_key]=row[0][0].xtra.get(output_key,0)+value/2
+        row[0][1].xtra[output_key]=row[0][1].xtra.get(output_key,0)+value/2
 
 def impute_psh(distance_matrix:pd.Series)->None:
     '''
@@ -143,7 +146,7 @@ def impute_pnc(distance_matrix:pd.Series)->None:
 def impute_surface(object:allowed_residue_source,fsasa_threshold=0.075):
     '''
     judge if a residue is on the protein surface with a fsasa criteria.
-
+    if fsasa > fsasa_threshold, .xtra['surface']=1; else=0
     Note:
     must run `_impute_fsasa` first.
     '''
@@ -152,6 +155,69 @@ def impute_surface(object:allowed_residue_source,fsasa_threshold=0.075):
             residue.xtra['surface']=1
         else:
             residue.xtra['surface']=0
+
+def _impute_surface(object:allowed_residue_source):
+    _ShrakeRupley=ShrakeRupley()
+    _ShrakeRupley.compute(object,level="A")
+    for residue in integrated_residue_iterator(object):
+        residue.xtra['sc_sasa']=sum([i.sasa for i in residue.get_atoms() if i.id not in ['N', 'CA','C','O']])
+        _fsasa=0.01*residue.xtra['sc_sasa']/residue.xtra['i_sasa']
+        residue.xtra['surface']=1 if _fsasa >0.075 else 0 
+
+def impute_vicinity(object:allowed_residue_source)->None:
+    '''
+    must run after `impute_CDR`
+    and after `impute_surface`
+    need to be fixed.
+    '''
+    fw_heavy_list=[]
+    vicinity_list=[]
+    for residue in integrated_residue_iterator(object):
+        #impute left /right anchor of CDR as vicinity 
+        #and get list of CDR / framework_ca separately
+
+        # if 'CDR' in residue.xtra['CDR']:
+        #     residue.xtra['vicinity']=1
+        #     if 'FW' in last_residue.xtra.get('CDR','X'):
+        #         last_residue.xtra['vicinity']=1
+        #         vicinity_list.append(last_residue)
+        #     vicinity_list.append(residue)            
+        # elif 'FW' in residue.xtra['CDR']:
+        #     fw_heavy_list.extend([atom for atom in residue.get_atoms() if atom.element != 'H'])
+        #     if 'CDR' in last_residue.xtra.get('CDR','X'):
+        #         residue.xtra['vicinity']=1
+        #         vicinity_list.append(residue) 
+        #     else:
+        #         residue.xtra['vicinity']=0
+        # else:
+        #     residue.xtra['vicinity']=0
+        if residue.xtra['surface']==1:
+            if 'FW' in residue.xtra['CDR']:
+                fw_heavy_list.extend([atom for atom in residue.get_atoms() if atom.element != 'H'])
+            elif 'AC' in residue.xtra['CDR'] or 'CDR' in residue.xtra['CDR']:
+                vicinity_list.append(residue)
+    
+    vicinity_heavy_dict=du.atom_within_threshold(fw_heavy_list,vicinity_list,4)
+
+    def get_parent_if_surface(atom:Atom)->Residue:
+        res:Residue=atom.get_parent()
+        if res.xtra['surface']==1:
+            return res
+        else:
+            return RESIDUE_HOLDER
+    # plus_vicinity_list=pd.Series(vicinity_heavy_dict.keys()).apply(get_parent_if_surface).value_counts().index.to_list()
+    plus_vicinity_list=list(set([get_parent_if_surface(i) for i in vicinity_heavy_dict.keys()]))
+    if RESIDUE_HOLDER in plus_vicinity_list:
+        plus_vicinity_list.remove(RESIDUE_HOLDER)
+    vicinity_list.extend(plus_vicinity_list)
+    # atom:Atom=Atom() -> a placeholder for pylance 
+    for residue in integrated_residue_iterator(object):
+        if residue in vicinity_list:
+            residue.xtra['vicinity']=1
+        else:
+            residue.xtra['vicinity']=0
+    
+    return vicinity_list
 
 def impute_surface_charge(object:allowed_residue_source):
     '''
@@ -210,29 +276,57 @@ class TAPExtractor(ResidueFeatureExtractor):
         self._produce_sequence()
         run_anarci(self.sequences,self.scheme,self.object)
         impute_cdr(self.object,self.scheme)
-        self.vicinity_residue=impute_vicinity(self.object)
+        
 
         #impute basic residue property:
         #SASA_INTERNAL,i_sasa,f_sasa,surface
         #static_charge,salt_bridge,salted_charge
-        #
+        
 
-        impute_sasa(self.object)
-        impute_static_feature_struct(self.object)
+        
+        impute_static_feature(self.object)
         impute_salt_bridge(self.object)
         impute_salted_charge_n_hydro(self.object)
+        
+        #this part test the sasa from dssp
+        # impute_dssp(self.object)
+        # for residue in integrated_residue_iterator(self.object):
+        #     residue.xtra['EXP_DSSP_RASA']=residue.xtra['EXP_DSSP_RASA']*100
+        # impute_fsasa(self.object,'EXP_DSSP_RASA')
+        
+        #this part test the sasa from biopython internal
+        impute_sasa(self.object)
         impute_fsasa(self.object)
         impute_surface(self.object)
+        
+
+        #this block test tap-defined sasa-surface
+        # _impute_surface(self.object)
+        
+        self.vicinity_residue=impute_vicinity(self.object)
+
         impute_surface_charge(self.object)
 
         #impute psh ppc pnc
-        self.vicinity_distance_matrix=residue_distance_matrix(self.vicinity_residue)
-        impute_psh(self.vicinity_distance_matrix)
-        impute_default_value(self.object,'psh',0)
-        impute_ppc(self.vicinity_distance_matrix)
-        impute_default_value(self.object,'ppc',0)
-        impute_pnc(self.vicinity_distance_matrix)
-        impute_default_value(self.object,'pnc',0)
+        #this block test the performance of only vicinity calculation
+        # self.vicinity_distance_matrix=residue_distance_matrix(self.vicinity_residue)
+        # impute_psh(self.vicinity_distance_matrix)
+        # impute_default_value(self.object,'psh',0)
+        # impute_ppc(self.vicinity_distance_matrix)
+        # impute_default_value(self.object,'ppc',0)
+        # impute_pnc(self.vicinity_distance_matrix)
+        # impute_default_value(self.object,'pnc',0)
+
+        #this block test the performance of full psh calculation
+        self.surface_distance_matrix=residue_distance_matrix([i for i in self.object.get_residues() if i.xtra['surface']==1 ])
+        impute_psh(self.surface_distance_matrix)
+        impute_ppc(self.surface_distance_matrix)
+        impute_pnc(self.surface_distance_matrix)
+        for residue in integrated_residue_iterator(self.object):
+            if residue.xtra['vicinity']==0:
+                residue.xtra['psh']=0
+                residue.xtra['ppc']=0
+                residue.xtra['pnc']=0
 
         self._object_feature_to_frame()
         self._reduce()
@@ -270,3 +364,36 @@ class TAPExtractor(ResidueFeatureExtractor):
 
 #         if not self._CDR_vicinity:
 #             pass
+
+if __name__=='__main__':
+    from multiprocessing import Pool
+    import glob,os,sys
+    from functools import reduce
+
+    test_database_path=sys.argv[1]
+    test_outputfile_path=sys.argv[2]
+
+    def write_tap(infile:str,outfile:str):
+        file_id=os.path.split(infile)[1].replace('.pdb','')
+        tap=TAPExtractor('i')
+        tap.transform(infile)
+        cdr_lenth=tap.fv_frame['CDR_lenth'].sum()
+        psh=tap.fv_frame['PSH'].sum()
+        ppc=tap.fv_frame['PPC'].sum()
+        pnc=tap.fv_frame['PNC'].sum()
+        SFvCSP=reduce(lambda x,y:x*y,tap.fv_frame['sc_SFvCSP'])
+        out=f'{file_id},{cdr_lenth},{psh},{ppc},{pnc},{SFvCSP}\n'
+        with open(outfile,'a') as f:
+            f.write(out)
+        return out
+
+    glob_str=os.path.join(test_database_path,'*.pdb')
+    # os.chdir('/home/zhenfeng/ProteinFeature_1/242CST_Models_Website')
+    pool = Pool(processes = 8,maxtasksperchild = 20)
+    # outfile='test0524.csv'
+    with open(test_outputfile_path,'w') as f:
+        f.write('file_id,cdr_lenth,psh,ppc,pnc,SFvCSP\n')
+    for i in glob.glob(glob_str):
+        pool.apply_async(write_tap,(i,test_outputfile_path))
+    pool.close()
+    pool.join()

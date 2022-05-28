@@ -11,6 +11,7 @@ import pymol
 from BaseClasses import ResidueFeatureExtractor
 from Bio.PDB.Structure import Structure
 from Bio.PDB.Residue import Residue
+from Bio.PDB.Chain import Chain
 from util import RESIDUE_HOLDER,allowed_residue_source
 from util import read_in,integrated_residue_iterator,sequence_from_object,write_fasta,wash_sequence
 from distance_util import residue_within_threshold 
@@ -244,7 +245,6 @@ class structure_aligner(ResidueFeatureExtractor):
         return self._align_structure(self,save_ligand,save_pocket,
                             ligandfile,ref_pocketfile,obj_pocketfile)
 
-
     def init_mapped_neighbor(self):
         '''
         a tool to init and reset the `mapped_neighbor` 
@@ -292,6 +292,13 @@ class structure_aligner(ResidueFeatureExtractor):
 
     # def _produce_feature(self,object_chain:str,reference_chain:str):
     #     self._align_sequence(object_chain,reference_chain)
+
+    def set_chain_as_ligand(self,chain:Chain):
+        assert chain in list(self.reference.get_chains()),'invalid chain'
+        self.selected_ligand=chain
+        _other_residue=[ residue for residue in self.proteins if residue not in list(chain.get_residues()) ]
+        self.neighbor=residue_within_threshold(_other_residue,self.selected_ligand,6)
+        self.neighbor_chain= tuple(set([i.get_parent().id for i in self.neighbor]))
 
     def transform(self) -> Tuple[Tuple[str],Tuple[float]]:
         '''

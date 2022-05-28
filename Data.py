@@ -27,7 +27,8 @@ amino1to3dict={
                   'T':'THR',
                   'W':'TRP',
                   'Y':'TYR',
-                  'V':'VAL'}
+                  'V':'VAL',
+                  'X':'XXX'}
 
 nucleic_acid_dict = {
     'A':'A',
@@ -210,3 +211,7 @@ GeorgeDSASA_scale = {
    'ARG':2.560,
 }
 
+
+hydrophobic_set={'VAL','ILE','LEU','PHE','MET','TYR','TRP','CYS'}
+Charg_set={'ARG','LYS','ASP','GLU'}
+Aroma_set={'PHE','TYR','TRP'}
