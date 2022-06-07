@@ -242,7 +242,7 @@ class structure_aligner(ResidueFeatureExtractor):
         (now use pymol.cmd.align but it's said that in low homology system, cmd.cealign/super performs better. )
         then save the ligand & pocket pdb upon request. 
         '''
-        return self._align_structure(self,save_ligand,save_pocket,
+        return self._align_structure(save_ligand,save_pocket,
                             ligandfile,ref_pocketfile,obj_pocketfile)
 
     def init_mapped_neighbor(self):
@@ -275,7 +275,7 @@ class structure_aligner(ResidueFeatureExtractor):
         self._set_reference_structure(struct)
         self._find_ligands()
         self._find_proteins()
-        self._compare_chain()
+        # self._compare_chain()
 
     def set_ligand(self,ligand:Residue):
         '''
@@ -323,15 +323,19 @@ class structure_aligner(ResidueFeatureExtractor):
             _mapped_count=len([i for i in self.mapped_neighbor if i.resname!='XXX'])
             print(_mapped_count,end='\t')
 
-            rmsd=self._align_structure(save_ligand=False,save_pocket=False)
-            
+            if _mapped_count>0:
+                rmsd=self._align_structure(save_ligand=False,save_pocket=False)
+            else:
+                rmsd=(99999,99999)
+
             if rmsd[1]<best_rmsd[1] or (rmsd[1]<=best_rmsd[1]+0.01 and mapped_count<_mapped_count):
                 best_rmsd=rmsd
                 best_combine=chain_combine
                 mapped_count=_mapped_count
             
-            print(rmsd,end='\t')
+            print(rmsd,end='\n')
             # print(best_rmsd)
+        self.mapped_count=mapped_count
         self.mapped_chain=best_combine
         self.rmsd=best_rmsd
         return best_combine,best_rmsd
@@ -349,6 +353,7 @@ class structure_aligner(ResidueFeatureExtractor):
         for obj_chain,ref_chain in zip(self.mapped_chain,self.neighbor_chain):
             self._align_sequence(obj_chain,ref_chain)
             self.map_neighbor()
+            self.mapped_count=len([i for i in self.mapped_neighbor if i.resname!='XXX'])
         return self._align_structure(save_ligand=save_ligand,save_pocket=save_pocket,
                                 ligandfile=ligandfile,ref_pocketfile=ref_pocketfile,obj_pocketfile=obj_pocketfile)
         # raise NotImplementedError

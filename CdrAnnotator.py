@@ -43,38 +43,45 @@ def run_anarci(sequence_dict:Dict[str,str],scheme:allowd_scheme='a',
         anarci_results=anarci.run_anarci(seq,scheme=scheme)
         anarci_maps=anarci_results[1][0]
         chain_infos=anarci_results[2][0]
-        assert anarci_maps,'this chain contains no Fv fragment'
-        id,end,_anarci_order,_Fv_annotation,_chain_type=0,-1,[],[],[]
-        for anarci_map,chain_info in zip(anarci_maps,chain_infos):
-            last_end,start,end=end,anarci_map[1],anarci_map[2]
+        # assert anarci_maps,'this chain contains no Fv fragment'
+        if anarci_maps:
+            id,end,_anarci_order,_Fv_annotation,_chain_type=0,-1,[],[],[]
+            for anarci_map,chain_info in zip(anarci_maps,chain_infos):
+                last_end,start,end=end,anarci_map[1],anarci_map[2]
 
+                _anarci_order.extend(
+                    [(' ',-1,' ')]*(start-last_end-1))
+                _Fv_annotation.extend(
+                    [f'Lk{id}']*(start-last_end-1))
+                _chain_type.extend(
+                    ['X']*(start-last_end-1))
+
+                _anarci_order.extend(
+                    [(' ',)+i[0] for i in anarci_map[0] if i[1]!='-'])
+                _Fv_annotation.extend(
+                    [f'Fv{id}']*(end-start+1))
+                _chain_type.extend(
+                    [chain_info['chain_type']]*(end-start+1))    
+
+                id += 1
+
+            last_end,start=end,len(seq)
             _anarci_order.extend(
-                [(' ',-1,' ')]*(start-last_end-1))
+                    [(' ',-1,' ')]*(start-last_end-1))
             _Fv_annotation.extend(
-                [f'Lk{id}']*(start-last_end-1))
+                    [f'Lk{id}']*(start-last_end-1))
             _chain_type.extend(
-                ['X']*(start-last_end-1))
+                    ['X']*(start-last_end-1))    
+            anarci_order.extend(_anarci_order)
+            Fv_annotation.extend(_Fv_annotation)
+            chain_type.extend(_chain_type)
 
-            _anarci_order.extend(
-                [(' ',)+i[0] for i in anarci_map[0] if i[1]!='-'])
-            _Fv_annotation.extend(
-                [f'Fv{id}']*(end-start+1))
-            _chain_type.extend(
-                [chain_info['chain_type']]*(end-start+1))    
+        else:
+            anarci_order.extend([(' ',-1,' ')]*len(seq))
+            Fv_annotation.extend(['Lk0']*len(seq))
+            chain_type.extend(['X']*len(seq))
 
-            id += 1
-
-        last_end,start=end,len(seq)
-        _anarci_order.extend(
-                [(' ',-1,' ')]*(start-last_end-1))
-        _Fv_annotation.extend(
-                [f'Lk{id}']*(start-last_end-1))
-        _chain_type.extend(
-                ['X']*(start-last_end-1))    
-        anarci_order.extend(_anarci_order)
-        Fv_annotation.extend(_Fv_annotation)
-        chain_type.extend(_chain_type)
-
+        
     if isinstance(object,Entity):
         _list_feature_into_residue(anarci_order,'anarci_order',object)
         _list_feature_into_residue(Fv_annotation,'Fv_annotation',object)
