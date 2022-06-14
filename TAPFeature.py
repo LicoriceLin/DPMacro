@@ -334,10 +334,10 @@ class TAPExtractor(ResidueFeatureExtractor):
     def _reduce(self):
         '''
         reduce residue-level feature to Fv-level feature 
-        save them in self.Fv_frame DataFrame
+        save them in self.reduced_frame DataFrame
         '''
         fv_fragments=self.frame[self.frame['Fv_annotation'].apply(lambda x: True if 'Fv' in x else False)].groupby(['chain','Fv_annotation'])
-        self.fv_frame=pd.DataFrame()
+        self.reduced_frame=pd.DataFrame()
         
         def _count_cdr(iter:Iterable)->int:
                 sum=0
@@ -346,12 +346,12 @@ class TAPExtractor(ResidueFeatureExtractor):
                         sum +=1
                 return sum
         
-        self.fv_frame['chain_type']=fv_fragments['chain_type'].apply(lambda x :x.iloc[0])
-        self.fv_frame['CDR_lenth']=fv_fragments['CDR'].apply(_count_cdr)
-        self.fv_frame['PSH']=fv_fragments['psh'].sum()
-        self.fv_frame['PPC']=fv_fragments['ppc'].sum()
-        self.fv_frame['PNC']=fv_fragments['pnc'].sum()
-        self.fv_frame['sc_SFvCSP']=fv_fragments['surface_charge'].sum()
+        self.reduced_frame['chain_type']=fv_fragments['chain_type'].apply(lambda x :x.iloc[0])
+        self.reduced_frame['CDR_lenth']=fv_fragments['CDR'].apply(_count_cdr)
+        self.reduced_frame['PSH']=fv_fragments['psh'].sum()
+        self.reduced_frame['PPC']=fv_fragments['ppc'].sum()
+        self.reduced_frame['PNC']=fv_fragments['pnc'].sum()
+        self.reduced_frame['sc_SFvCSP']=fv_fragments['surface_charge'].sum()
 
 # class ExtendedTAPExtractor(ResidueFeatureExtractor):
 #     '''
@@ -377,11 +377,11 @@ if __name__=='__main__':
         file_id=os.path.split(infile)[1].replace('.pdb','')
         tap=TAPExtractor('i')
         tap.transform(infile)
-        cdr_lenth=tap.fv_frame['CDR_lenth'].sum()
-        psh=tap.fv_frame['PSH'].sum()
-        ppc=tap.fv_frame['PPC'].sum()
-        pnc=tap.fv_frame['PNC'].sum()
-        SFvCSP=reduce(lambda x,y:x*y,tap.fv_frame['sc_SFvCSP'])
+        cdr_lenth=tap.reduced_frame['CDR_lenth'].sum()
+        psh=tap.reduced_frame['PSH'].sum()
+        ppc=tap.reduced_frame['PPC'].sum()
+        pnc=tap.reduced_frame['PNC'].sum()
+        SFvCSP=reduce(lambda x,y:x*y,tap.reduced_frame['sc_SFvCSP'])
         out=f'{file_id},{cdr_lenth},{psh},{ppc},{pnc},{SFvCSP}\n'
         with open(outfile,'a') as f:
             f.write(out)

@@ -1,13 +1,14 @@
-from typing import Iterable,Callable,Dict
-import copy
+from typing import Iterable,Union,Dict
+# import copy
 import tempfile
 
 from Bio.PDB.Residue import Residue
 from Bio.PDB.Structure import Structure
-from numpy import matrix
+from Bio.PDB.Chain import Chain
+# from numpy import matrix
 from BaseClasses import ResidueFeatureExtractor
-from distance_util import residue_distance_matrix,residue_within_threshold
-from util import allowed_residue_source,integrated_residue_iterator,sequence_from_object,impute_default_value
+from distance_util import residue_distance_matrix,residue_within_threshold,distance_between_entity
+from util import allowed_residue_source,integrated_residue_iterator,sequence_from_object,impute_default_value,read_in,CHAIN_HOLDER,write_out
 from Data import hydrophobic_set,Charg_set,Aroma_set,SASA_scale,amino1to3dict
 from BiopyInternalFeature import impute_sasa,impute_angles,impute_hse,impute_dssp
 from TAPFeature import impute_surface,impute_static_feature,impute_fsasa
@@ -105,7 +106,7 @@ def impute_pssm(object:Structure):
         with tempfile.TemporaryDirectory() as dirname:
             pass
 
-#used 
+#unused 
 def impute_sNxx(object:Structure,key:str,ref_set:Iterable[str],neighbor_range:int=6):
     '''
     structure version of Nxx,search for spacial vicinity rather than sequence vicinity.   
@@ -115,12 +116,55 @@ def impute_sNxx(object:Structure,key:str,ref_set:Iterable[str],neighbor_range:in
         Nxx=sum([neighbor_list.count(i) for i in ref_set])
         residue.xtra[key]=Nxx
 
+def remove_nocontact_chains(struct:Union[str,Structure],chainid:str,neighbor_threshold=6,outfile:Union[str,None]=None)->Structure:
+    '''
+    usage: explicit as name of the function and variants.
+    
+    '''
+    if isinstance(struct,str):
+        s=read_in(struct)
+    elif isinstance(struct,Structure):
+        s=struct
 
+    object_chain:Chain=s[0][chainid]
+    chain:Chain=CHAIN_HOLDER
+    remove_chain_list=[]
+    for chain in s.get_chains():
+        if chain is not object_chain:
+            distance=distance_between_entity(chain,object_chain)[2]
+            # print(chain.id,distance)
+            if distance>neighbor_threshold:
+                remove_chain_list.extend(chain.id)
+    for chainid in remove_chain_list:
+        s[0].detach_child(chainid)
+    if outfile is not None:
+        write_out(s,outfile)
+    return s
 
 class PPSExtractor(ResidueFeatureExtractor):
+    '''
+    sample usage:
+    a=pfe.PPSExtractor()
+    s=u.read_in('/home/zhenfeng/ProteinFeature_1/DPMacro/test/1moe.pdb')
+    a.transform(s,if_remove_nocontact_chains=True,object_chain='A')
+    a.reduce(a.object[0]['A'][5])
+
+    Note:
+    transform
+    1.first argument of transform: allow a structure object or a path to pdb file
+    2.second argument of transform: its function is just as the name; not positional (you cannot omit `if_remove_nocontact_chains`).
+    3.third argument of transform: the chain contains the mutation; not positional.
+    
+    reduce:
+    only allow Residue object. these Residue objects are inside the input strcuture or created when running transform. 
+    it's recommend to visit them by a.object[frameid][chainid][residueid]
+    '''
     def __init__(self):
         ResidueFeatureExtractor.__init__(self,operation_name='PPS',canonical_only=True)
-    def _produce_feature(self):
+    def _produce_feature(self,if_remove_nocontact_chains:bool=False,object_chain:Union[str,None]=None):
+        if if_remove_nocontact_chains and object_chain:
+            self.object=remove_nocontact_chains(self.object,object_chain)
+            self._init_dataframe()
 
         #impute_internal_feature
         impute_dssp(self.object)
@@ -156,7 +200,7 @@ class PPSExtractor(ResidueFeatureExtractor):
 
         self._object_feature_to_frame()
 
-    def reduce(self,residue:Residue):
+    def _reduce(self,residue:Union[Residue,None]=None)->Dict[str,Union[str,float]]:
         assert residue in list(self.object.get_residues()),'invalid residue'
         output_dict={}
         for key in [#basic description
@@ -184,8 +228,13 @@ class PPSExtractor(ResidueFeatureExtractor):
             output_dict[key]=residue.xtra[key]
         
         chain_belong=residue.get_parent().id
+        surface_residue_counts=self.frame.groupby('chain')['surface'].sum()[chain_belong]
         for key in ['PFWY','PRKDE','PL','PLIV']:
-            output_dict[key]=self.frame.groupby('chain')[key].sum()[chain_belong]
+            output_dict[key]=self.frame.groupby('chain')[key].sum()[chain_belong]/surface_residue_counts
+        self.reduced_frame=output_dict
         return output_dict
+
+    def reduce(self,residue:Residue)->Dict[str,Union[str,float]]:
+        return self._reduce(residue)
 
 
