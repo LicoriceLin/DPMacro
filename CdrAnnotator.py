@@ -13,7 +13,7 @@ import pandas as pd
 
 # from Bio.PDB.Structure import Structure
 from Bio.PDB.Entity import Entity
-from Bio.PDB.Atom import Atom
+# from Bio.PDB.Atom import Atom
 from Bio.PDB.Chain import Chain
 from Bio.PDB.StructureBuilder import StructureBuilder
 
@@ -43,38 +43,45 @@ def run_anarci(sequence_dict:Dict[str,str],scheme:allowd_scheme='a',
         anarci_results=anarci.run_anarci(seq,scheme=scheme)
         anarci_maps=anarci_results[1][0]
         chain_infos=anarci_results[2][0]
-        assert anarci_maps,'this chain contains no Fv fragment'
-        id,end,_anarci_order,_Fv_annotation,_chain_type=0,-1,[],[],[]
-        for anarci_map,chain_info in zip(anarci_maps,chain_infos):
-            last_end,start,end=end,anarci_map[1],anarci_map[2]
+        # assert anarci_maps,'this chain contains no Fv fragment'
+        if anarci_maps:
+            id,end,_anarci_order,_Fv_annotation,_chain_type=0,-1,[],[],[]
+            for anarci_map,chain_info in zip(anarci_maps,chain_infos):
+                last_end,start,end=end,anarci_map[1],anarci_map[2]
 
+                _anarci_order.extend(
+                    [(' ',-1,' ')]*(start-last_end-1))
+                _Fv_annotation.extend(
+                    [f'Lk{id}']*(start-last_end-1))
+                _chain_type.extend(
+                    ['X']*(start-last_end-1))
+
+                _anarci_order.extend(
+                    [(' ',)+i[0] for i in anarci_map[0] if i[1]!='-'])
+                _Fv_annotation.extend(
+                    [f'Fv{id}']*(end-start+1))
+                _chain_type.extend(
+                    [chain_info['chain_type']]*(end-start+1))    
+
+                id += 1
+
+            last_end,start=end,len(seq)
             _anarci_order.extend(
-                [(' ',-1,' ')]*(start-last_end-1))
+                    [(' ',-1,' ')]*(start-last_end-1))
             _Fv_annotation.extend(
-                [f'Lk{id}']*(start-last_end-1))
+                    [f'Lk{id}']*(start-last_end-1))
             _chain_type.extend(
-                ['X']*(start-last_end-1))
+                    ['X']*(start-last_end-1))    
+            anarci_order.extend(_anarci_order)
+            Fv_annotation.extend(_Fv_annotation)
+            chain_type.extend(_chain_type)
 
-            _anarci_order.extend(
-                [(' ',)+i[0] for i in anarci_map[0] if i[1]!='-'])
-            _Fv_annotation.extend(
-                [f'Fv{id}']*(end-start+1))
-            _chain_type.extend(
-                [chain_info['chain_type']]*(end-start+1))    
+        else:
+            anarci_order.extend([(' ',-1,' ')]*len(seq))
+            Fv_annotation.extend(['Lk0']*len(seq))
+            chain_type.extend(['X']*len(seq))
 
-            id += 1
-
-        last_end,start=end,len(seq)
-        _anarci_order.extend(
-                [(' ',-1,' ')]*(start-last_end-1))
-        _Fv_annotation.extend(
-                [f'Lk{id}']*(start-last_end-1))
-        _chain_type.extend(
-                ['X']*(start-last_end-1))    
-        anarci_order.extend(_anarci_order)
-        Fv_annotation.extend(_Fv_annotation)
-        chain_type.extend(_chain_type)
-
+        
     if isinstance(object,Entity):
         _list_feature_into_residue(anarci_order,'anarci_order',object)
         _list_feature_into_residue(Fv_annotation,'Fv_annotation',object)
@@ -129,50 +136,7 @@ def impute_cdr(object:allowed_residue_source,scheme:allowd_scheme='a')->None:
         elif i.xtra['anarci_order'][1]>annotation['FR4'] and i.xtra['anarci_order'][1]<=annotation['end']:
             i.xtra['CDR']='FW4'
 
-def impute_vicinity(object:allowed_residue_source)->None:
-    '''
-    must run after `impute_CDR`
-    need to be fixed.
-    '''
-    fw_heavy_list=[]
-    vicinity_list=[]
-    for residue in integrated_residue_iterator(object):
-        #impute left /right anchor of CDR as vicinity 
-        #and get list of CDR / framework_ca separately
 
-        # if 'CDR' in residue.xtra['CDR']:
-        #     residue.xtra['vicinity']=1
-        #     if 'FW' in last_residue.xtra.get('CDR','X'):
-        #         last_residue.xtra['vicinity']=1
-        #         vicinity_list.append(last_residue)
-        #     vicinity_list.append(residue)            
-        # elif 'FW' in residue.xtra['CDR']:
-        #     fw_heavy_list.extend([atom for atom in residue.get_atoms() if atom.element != 'H'])
-        #     if 'CDR' in last_residue.xtra.get('CDR','X'):
-        #         residue.xtra['vicinity']=1
-        #         vicinity_list.append(residue) 
-        #     else:
-        #         residue.xtra['vicinity']=0
-        # else:
-        #     residue.xtra['vicinity']=0
-        
-        if 'FW' in residue.xtra['CDR']:
-            fw_heavy_list.extend([atom for atom in residue.get_atoms() if atom.element != 'H'])
-        elif 'AC' in residue.xtra['CDR'] or 'CDR' in residue.xtra['CDR']:
-            vicinity_list.append(residue)
-    
-    vicinity_heavy_dict=du.atom_within_threshold(fw_heavy_list,vicinity_list,4.5)
-
-    plus_vicinity_list=pd.Series(vicinity_heavy_dict.keys()).apply(Atom.get_parent).value_counts().index.to_list()
-    vicinity_list.extend(plus_vicinity_list)
-    # atom:Atom=Atom() -> a placeholder for pylance 
-    for residue in integrated_residue_iterator(object):
-        if residue in vicinity_list:
-            residue.xtra['vicinity']=1
-        else:
-            residue.xtra['vicinity']=0
-    
-    return vicinity_list
 
 class hmt_FvProcessor(ResidueFeatureExtractor):
     def __init__(self, scheme:allowd_scheme) -> None:

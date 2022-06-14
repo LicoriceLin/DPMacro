@@ -48,7 +48,7 @@ class StructFeatureExtractor:
         see docstring of each method.
 
     '''
-    def __init__(self,operation_name:str='',canonical_only:bool=True)->None:
+    def __init__(self,operation_name:str='',canonical_only:bool=True,if_reduce:bool=False)->None:
         '''
         set the name of your Extractor
         decide the parameters for transform. 
@@ -56,6 +56,7 @@ class StructFeatureExtractor:
         '''
         self.operation_name=operation_name
         self._canonical_only=canonical_only
+        self._if_reduce=if_reduce
         self.object= Structure('')
         self.frame=pd.DataFrame()
         pass
@@ -111,7 +112,7 @@ class StructFeatureExtractor:
         '''
         pass
 
-    def transform(self,struct:Union[str,Structure])->pd.DataFrame:
+    def transform(self,struct:Union[str,Structure],**kwargs)->Union[pd.DataFrame,Dict,Iterable]:
         '''
         1.set the input structure( both Bio.Structure object and path to pdb file is allowed) to self.object
         2.do some simple pre-process( e.g. remove hetatm, split Fv domain)
@@ -121,8 +122,12 @@ class StructFeatureExtractor:
         '''
         self._set_structure(struct)
         self._init_dataframe()
-        self._produce_feature()
-        return self.frame
+        self._produce_feature(**kwargs)
+        if self._if_reduce:
+            self._reduce()
+            return self.reduced_frame
+        else:
+            return self.frame
 
     def _object_feature_to_frame(self)->None:
         '''
@@ -150,6 +155,16 @@ class StructFeatureExtractor:
         I'm trying to wrap it into a more convenient manner  
         '''
         raise NotImplementedError
+
+    def _reduce(self):
+        '''
+        (interface for rewrite in its subclass.)
+        reduce Residue property to Chain-level or Model-level property
+        expected behavior:
+        deal with the self.frame.groupby(...) object.
+        return a chain or model level feature frame.
+        '''
+        self.reduced_frame:Iterable=pd.DataFrame()
 
 class ResidueFeatureExtractor(StructFeatureExtractor):
     '''
@@ -206,15 +221,7 @@ class ResidueFeatureExtractor(StructFeatureExtractor):
         '''
         self.sequences=sequence_from_frame(self.frame,map)
 
-    def _reduce(self):
-        '''
-        (interface for rewrite in its subclass.)
-        reduce Residue property to Chain-level or Model-level property
-        expected behavior:
-        deal with the self.frame.groupby(...) object.
-        return a chain or model level feature frame.
-        '''
-        raise NotImplementedError
+
 
 #unimplemented
 class ChainFeatureExtractor(StructFeatureExtractor):  

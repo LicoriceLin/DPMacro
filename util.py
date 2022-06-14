@@ -4,18 +4,20 @@ some useful recurrent codes
 '''
 
 
+# import imp
 import Bio.PDB as BP
 import pandas as pd 
+import re
 from Bio.PDB.Chain import Chain
 from Bio.PDB.Structure import Structure
 from Bio.PDB.Model import Model
 from Bio.PDB.Entity import Entity
 from Bio.PDB.Residue import Residue
 from Bio.PDB.Atom import Atom
-
+import numpy as np
 from Data import amino3to1dict
 # from distance_util import idstr2tuple
-from typing import List,Tuple,Union,Generator,Iterable,Literal,Dict,Any
+from typing import List,Tuple,Union,Generator,Iterable,Literal,Dict,Any,Callable
 from collections.abc import Iterable as collections_Iterable
 
 # allowd_scheme=Literal['c','chothia','k','kabat','i','imgt','a','aho','m','martin','w','wolfguy']
@@ -25,10 +27,12 @@ STRUCTURE_HOLDER=Structure('place_holder')
 MODEL_HOLDER=Model('place_holder')
 CHAIN_HOLDER=Chain('place_holder')
 RESIDUE_HOLDER=Residue(('place_holder',0,' '),'XXX','')
-#set_parent has some unknown bug. use .add instead. 
+ATOM_HOLDER=Atom('CA',np.array([0,0,0],dtype=np.float32),0.0,1.0,' ',' CA ',0,'C',None,None)
+#set_parent has some unknown bug. use `Parent.add` instead. 
 STRUCTURE_HOLDER.add(MODEL_HOLDER)
 MODEL_HOLDER.add(CHAIN_HOLDER)
 CHAIN_HOLDER.add(RESIDUE_HOLDER)
+RESIDUE_HOLDER.add(ATOM_HOLDER)
 
 def read_in(file:str,id:Union[str,None]=None)->Structure:
     '''
@@ -51,6 +55,13 @@ def write_out(strcture:Entity,file:str='tmp.pdb',write_end:bool=True, preserve_a
     io = BP.PDBIO()
     io.set_structure(strcture)
     io.save(file,write_end=write_end,preserve_atom_numbering=preserve_atom_numbering)
+
+def impute_beta(object:allowed_residue_source,func:Callable[[Residue], float]):
+    '''
+    func needs a Residue as input, a float as output
+    '''
+    for atom in integrated_atom_iterator(object):
+        atom.bfactor=func(atom.get_parent())
 
 def extract_hetatm(input:Chain,inplace:bool=False)->List[Chain]:  
     '''
@@ -126,6 +137,16 @@ def sequence_from_frame(frame:pd.DataFrame,map:dict=amino3to1dict)->Dict[str,str
     _seq_series=frame.groupby('chain')['resname'].apply(list3_to_str1)
     return dict(_seq_series)
 
+def wash_sequence(seq_dict:Dict[str,str])->Dict[str,str]:
+    '''
+    use output_dict of `sequence_from_object` or `sequence_from_frame` as input.
+    remove the 'X's at the beginning and end of all sequence.
+    '''
+    pure_dict={}
+    for chain,seq in seq_dict.items():
+        pure_dict[chain]=re.sub('X+$|^X+','',seq)
+    return pure_dict
+
 def integrated_residue_iterator(object:allowed_residue_source)->Generator[Residue,None,None]:
     '''
     iterate the Residue instance in Entity, Atom(return its parent in this case ),
@@ -142,6 +163,33 @@ def integrated_residue_iterator(object:allowed_residue_source)->Generator[Residu
             yield from integrated_residue_iterator(i)
     else:
         raise TypeError
+
+def split_multiframe(infile:str)->None:
+    s=read_in(infile)
+    i=0
+    for model in s.get_models():
+        write_out(model,infile.replace('.pdb',f'_{i}.pdb'))
+        i +=1
+
+
+def write_fasta(seq_dict:dict,prefix:str,chainid:Union[str,None]=None,output:str='poc.fasta',rewrite:bool=False):
+    '''
+    write out a fasta file from the seq_dict 
+            ({chainid:seq},usually generated from util.sequence_from_object or util.sequence_from_frame)
+    prefix:a str to write before chainid in seq_dict
+    chainid which chain to write out. set None if you want to write all. default = None.
+    output: file name of output. default = 'poc.fasta'
+    rewrite: if clear the origin component of the output file. default = False.
+    '''
+    mode='w' if rewrite else 'a' 
+    with open(output,mode) as f:
+        if chainid is None:
+            for chain,seq in seq_dict.items():
+                f.write('>'+prefix+chain+'\n')
+                f.write(seq+'\n')
+        else:
+            f.write('>'+prefix+chainid+'\n')
+            f.write(seq_dict[chainid]+'\n')
 
 def integrated_atom_iterator(object:Union[Entity,Iterable[Entity],Atom,Iterable[Atom]])->Generator[Atom,None,None]:
     '''
