@@ -7,7 +7,7 @@ from Bio.PDB.Structure import Structure
 from Bio.PDB import DSSP,ShrakeRupley,HSExposureCB
 
 from util import write_out
-from util import integrated_residue_iterator,allowed_residue_source
+from util import integrated_residue_iterator,allowed_residue_source,impute_default_value
 
 def impute_dssp(object:Structure,dssp_argsargs:Dict={}):
     '''
@@ -37,7 +37,8 @@ def impute_dssp(object:Structure,dssp_argsargs:Dict={}):
         'O_NH_2_ENERGY_DSSP'
         
         SASA:
-        'EXP_DSSP_RASA': float
+        'EXP_DSSP_RASA': float,
+        'EXP_DSSP_ASA':float
 
         (an invalid 'feature':
         'DSSP_INDEX': int,residue index )
@@ -51,6 +52,23 @@ def impute_dssp(object:Structure,dssp_argsargs:Dict={}):
         _pdb=os.path.join(dirname,'tmp.pdb')
         write_out(object,_pdb)
         DSSP(object[0],_pdb,**dssp_argsargs)
+    impute_default_value(object,'SS_DSSP','x')
+    for key in ['NH_O_1_RELIDX_DSSP',
+        'NH_O_1_ENERGY_DSSP',
+        'O_NH_1_RELIDX_DSSP',
+        'O_NH_1_ENERGY_DSSP',
+        'NH_O_2_RELIDX_DSSP',
+        'NH_O_2_ENERGY_DSSP',
+        'O_NH_2_RELIDX_DSSP',
+        'O_NH_2_ENERGY_DSSP',
+        'EXP_DSSP_RASA',
+        'EXP_DSSP_ASA',
+        'PHI_DSSP',
+        'PSI_DSSP',
+        'DSSP_INDEX']:
+        
+        impute_default_value(object,key,-1)
+
 
 def impute_sasa(object:Structure,sasa_argsargs:Dict={}):
     '''
@@ -89,8 +107,10 @@ def impute_hse(object:Structure,hse_argsargs:Dict={}):
 
     '''
     HSExposureCB(object,**hse_argsargs)
+    impute_default_value(object,'EXP_HSE_B_U',-1)
+    impute_default_value(object,'EXP_HSE_B_D',1)
     for residue in object.get_residues():
-        residue.xtra['EXP_HSE_RATIO']=residue.xtra['EXP_HSE_B_U']/residue.xtra['EXP_HSE_B_D']
+        residue.xtra['EXP_HSE_RATIO']=residue.xtra['EXP_HSE_B_U']/residue.xtra['EXP_HSE_B_D'] if residue.xtra['EXP_HSE_B_D'] != 0 else 20
 
 def impute_angles(object:allowed_residue_source):
     '''
