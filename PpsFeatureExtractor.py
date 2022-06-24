@@ -158,6 +158,41 @@ class PPSExtractor(ResidueFeatureExtractor):
     reduce:
     only allow Residue object. these Residue objects are inside the input strcuture or created when running transform. 
     it's recommend to visit them by a.object[frameid][chainid][residueid]
+
+    explanation of the output features:
+
+    #basic description (charge,hydrophobicity,surface_or_internal,salt_bridge)
+    'hydrophobicity','static_charge',
+    
+    'EXP_DSSP_ASA','EXP_DSSP_RASA','SASA_INTERNAL','i_sasa','georged_i_sasa','f_sasa',
+    'surface','salt_bridge','salted_charge','salted_hydrophobicity',
+    
+    #DSSP description (the secodary classification calculated by dssp (SS_DSSSP) , plus some intermediate results )
+    'SS_DSSP','NH_O_1_RELIDX_DSSP','NH_O_1_ENERGY_DSSP','O_NH_1_RELIDX_DSSP',
+    'O_NH_1_ENERGY_DSSP','NH_O_2_RELIDX_DSSP','NH_O_2_ENERGY_DSSP',
+    'O_NH_2_RELIDX_DSSP','O_NH_2_ENERGY_DSSP',
+
+    #angles
+    'PHI_INTERNAL','PSI_INTERNAL','OMG_INTERNAL','TAU_INTERNAL','CHI1_INTERNAL',
+    
+    #hse(half-sphere exposure),describe to what extent a residue is buried )
+    'EXP_HSE_B_U','EXP_HSE_B_D','EXP_HSE_RATIO',
+    
+    #pps-local values. count the number of certain type of residue in sequential-vicinity of the mutation site.
+    'NHydro','NCharg',
+    
+    #TAP-like feature
+    'psh','ppc','pnc'
+    
+    #fraction of certain type of residue on the surface
+    'PFWY','PRKDE','PL','PLIV'
+
+
+    # recommend to use these feature's difference before and after mutation:
+    'hydrophobicity','static_charge','i_sasa','EXP_DSSP_RASA','f_sasa'
+    'salted_charge','salted_hydrophobicity',
+    'EXP_HSE_RATIO', 'psh','ppc','pnc'
+
     '''
     def __init__(self):
         ResidueFeatureExtractor.__init__(self,operation_name='PPS',canonical_only=True)
@@ -203,13 +238,13 @@ class PPSExtractor(ResidueFeatureExtractor):
     def _reduce(self,residue:Union[Residue,None]=None)->Dict[str,Union[str,float]]:
         assert residue in list(self.object.get_residues()),'invalid residue'
         output_dict={}
-        for key in [#basic description
+        for key in [#basic description (charge,hydrophobicity,surface_or_internal,salt_bridge)
                     'hydrophobicity','static_charge',
                     
                     'EXP_DSSP_ASA','EXP_DSSP_RASA','SASA_INTERNAL','i_sasa','georged_i_sasa','f_sasa',
                     'surface','salt_bridge','salted_charge','salted_hydrophobicity',
                     
-                    #DSSP description
+                    #DSSP description (the secodary classification calculated by dssp (SS_DSSSP) , plus some intermediate results )
                     'SS_DSSP','NH_O_1_RELIDX_DSSP','NH_O_1_ENERGY_DSSP','O_NH_1_RELIDX_DSSP',
                     'O_NH_1_ENERGY_DSSP','NH_O_2_RELIDX_DSSP','NH_O_2_ENERGY_DSSP',
                     'O_NH_2_RELIDX_DSSP','O_NH_2_ENERGY_DSSP',
@@ -217,14 +252,24 @@ class PPSExtractor(ResidueFeatureExtractor):
                     #angles
                     'PHI_INTERNAL','PSI_INTERNAL','OMG_INTERNAL','TAU_INTERNAL','CHI1_INTERNAL',
                     
-                    #hse
+                    #hse(half-sphere exposure),describe to what extent a residue is buried )
                     'EXP_HSE_B_U','EXP_HSE_B_D','EXP_HSE_RATIO',
                     
-                    #pps
+                    #pps-local values. count the number of certain type of residue in sequential-vicinity of the mutation site.
                     'NHydro','NCharg',
                     
                     #TAP-like feature
-                    'psh','ppc','pnc']:
+                    'psh','ppc','pnc'
+                    
+                    #fraction of certain type of residue on the surface
+                    #'PFWY','PRKDE','PL','PLIV'
+
+
+                    # recommend to use these feature's difference before and after mutation:
+                    #  'hydrophobicity','static_charge','i_sasa','EXP_DSSP_RASA','f_sasa'
+                    #  'salted_charge','salted_hydrophobicity',
+                    #  'EXP_HSE_RATIO', 'psh','ppc','pnc'
+                    ]:
             output_dict[key]=residue.xtra[key]
         
         chain_belong=residue.get_parent().id

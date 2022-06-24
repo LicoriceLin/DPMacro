@@ -110,7 +110,7 @@ def impute_hse(object:Structure,hse_argsargs:Dict={}):
     impute_default_value(object,'EXP_HSE_B_U',-1)
     impute_default_value(object,'EXP_HSE_B_D',1)
     for residue in object.get_residues():
-        residue.xtra['EXP_HSE_RATIO']=residue.xtra['EXP_HSE_B_U']/residue.xtra['EXP_HSE_B_D']
+        residue.xtra['EXP_HSE_RATIO']=residue.xtra['EXP_HSE_B_U']/residue.xtra['EXP_HSE_B_D'] if residue.xtra['EXP_HSE_B_D'] != 0 else 20
 
 def impute_angles(object:allowed_residue_source):
     '''
