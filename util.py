@@ -231,6 +231,31 @@ def _list_feature_into_frame(feature_list:Iterable,key:str,frame:pd.DataFrame):
     else:
         frame[key]=feature_list
 
+def renum_according_ref(infile:str,reffile:str,outfile:str)->None:
+    '''
+    '''
+    s=read_in(infile)
+    s_ref=read_in(reffile)
+    assert len(list(integrated_residue_iterator(s)))==len(list(integrated_residue_iterator(s_ref))),'residue numbers are not consistent!'
+    def tmp_id(x:tuple):
+        return x[0],x[1],x[2]+'___'
+
+    def true_id(x:tuple):
+        return x[0],x[1],x[2].replace('___','')
+
+    for res_,res_ref in zip(integrated_residue_iterator(s),integrated_residue_iterator(s_ref)):
+        res_.id=tmp_id(res_ref.id)
+
+    for res_ in integrated_residue_iterator(s):
+        res_.id=true_id(res_.id)
+
+    for chain_,chain_ref in zip(s.get_chains(),s_ref.get_chains()):
+        chain_.id=chain_ref.id+'___'
+
+    for chain_ in s.get_chains():
+        chain_.id=chain_.id.replace('___','')
+
+    write_out(s,outfile)
 
 #test code
 #need to be update
