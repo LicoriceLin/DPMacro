@@ -5,24 +5,29 @@ annotate the CDRs and their vicinity.
 '''
 
 from ctypes import Structure
-from typing import Dict, Tuple,Union
+from typing import Dict, Tuple,Union,List,Iterable
 # import warnings
 
 import anarci
 import pandas as pd
+from itertools import chain
+from numpy.linalg import norm
 
-# from Bio.PDB.Structure import Structure
+from Bio.PDB.Structure import Structure
 from Bio.PDB.Entity import Entity
-# from Bio.PDB.Atom import Atom
 from Bio.PDB.Chain import Chain
+from Bio.PDB.Residue import Residue
 from Bio.PDB.StructureBuilder import StructureBuilder
+from Bio.PDB.Polypeptide import PPBuilder
 
-from BaseClasses import ResidueFeatureExtractor
-from util import _list_feature_into_residue,_list_feature_into_frame,integrated_residue_iterator
-from util import write_out,add_chain
-from util import allowed_residue_source,allowd_scheme
-from Data import CDR_annotations
-import distance_util as du
+from .BaseClasses import ResidueFeatureExtractor
+from .util import _list_feature_into_residue,_list_feature_into_frame,integrated_residue_iterator
+from .util import write_out,add_chain
+from .util import allowed_residue_source,allowd_scheme
+from .Data import CDR_annotations
+# import distance_util as du
+
+
 
 def run_anarci(sequence_dict:Dict[str,str],scheme:allowd_scheme='a',
                 object:Union[allowed_residue_source,None]=None,frame:Union[pd.DataFrame,None]=None)->Tuple[list,list,list]:
@@ -136,6 +141,88 @@ def impute_cdr(object:allowed_residue_source,scheme:allowd_scheme='a')->None:
         elif i.xtra['anarci_order'][1]>annotation['FR4'] and i.xtra['anarci_order'][1]<=annotation['end']:
             i.xtra['CDR']='FW4'
 
+def peptide_is_fv(list)->bool:
+    '''
+    temparory, not rubust function to distinguish fv from lk
+    use peptide list as input
+    '''
+    if 90<len(list)<130:
+        return True
+    else:
+        return False
+
+def actually_same_chain(pep1:List[Residue],pep2:List[Residue])->bool:
+    pep1_n=pep1[-1]['N']
+    pep2_ca=pep2[0]['CA']
+    dis=norm((pep1_n.coord-pep2_ca.coord),ord=2)
+    if dis >5:
+        return False
+    else:
+        return True
+
+def consecutive_resid_list(start_id:int,len)->List[Tuple[str,int,str]]:
+    resid_list=[]
+    for i in range(start_id,start_id+len):
+        resid_list.append((' ',i,' '))
+    return resid_list
+
+def renumber_from_resid_list(pep:List[Residue],resid_list:List[Tuple[str,int,str]])->List[Residue]:
+    if len(pep) != len(resid_list):
+        raise ValueError('check the lenth of `resid_list`')
+    new_pep=[]
+    for res,id in zip(pep,resid_list):
+        new_res=res.copy()
+        new_res.id=id
+        new_pep.append(new_res)
+    return new_pep
+
+def build_new_chain_from_pep(peps:Iterable[List[Residue]],newchainid:str)->Chain:
+    new_chain=Chain(newchainid)
+    for residue in chain(*peps):
+        # print(residue)
+        res_=residue.copy()
+        new_chain.add(res_)
+    return new_chain
+
+def lk_fv(pep1:List[Residue],pep2:List[Residue],id:str)->Chain:
+    id_list=consecutive_resid_list(pep2[0].id[1]-len(pep1),len(pep1))
+    chain_=build_new_chain_from_pep(
+        [renumber_from_resid_list(pep1,id_list),pep2],
+        id
+    )
+    return chain_
+
+def fv_lk(pep1:List[Residue],pep2:List[Residue],id:str)->Chain:
+    id_list=consecutive_resid_list(pep1[-1].id[1]+1,len(pep2))
+    chain_=build_new_chain_from_pep(
+        [pep1,renumber_from_resid_list(pep2,id_list)],
+        id
+    )
+    return chain_
+
+def lk_fv_lk(pep1:List[Residue],pep2:List[Residue],pep3:List[Residue],id:str)->Chain:
+    id_list1=consecutive_resid_list(pep2[0].id[1]-len(pep1),len(pep1))
+    id_list3=consecutive_resid_list(pep2[-1].id[1]+1,len(pep3))
+    chain_=build_new_chain_from_pep(
+        [   renumber_from_resid_list(pep1,id_list1),
+            pep2,
+            renumber_from_resid_list(pep3,id_list3)],
+        id
+    )
+    return chain_
+
+def fv(pep1:List[Residue],id:str)->Chain:
+    return build_new_chain_from_pep([pep1],id)
+
+def build_structure(chain_dict:Dict[str,Chain],id:str='tmp')->Structure:
+    builder=StructureBuilder()
+    builder.init_structure(structure_id=id)
+    builder.init_model(0)
+
+    for chainid,chain in chain_dict.items():
+        add_chain(chain,chainid,builder.structure[0])
+    
+    return builder.get_structure()
 
 
 class hmt_FvProcessor(ResidueFeatureExtractor):
@@ -163,27 +250,6 @@ class hmt_FvProcessor(ResidueFeatureExtractor):
                 new_chain_code=linker_code[i]
             return new_chain_code
 
-        # def set_bfactor(CDR:str,chaintype:str)->float:
-        #     if chaintype in ['K','L']:
-        #         if CDR=='CDR1':
-        #             return 11
-        #         elif CDR=='CDR2':
-        #             return 12
-        #         elif CDR=='CDR3':
-        #             return 13
-        #         else:
-        #             return 10
-        #     elif chaintype=='H':
-        #         if CDR=='CDR1':
-        #             return 21
-        #         elif CDR=='CDR2':
-        #             return 22
-        #         elif CDR=='CDR3':
-        #             return 23
-        #         else:
-        #             return 20
-        #     else:
-        #         return 0
 
         def set_bfactor(CDR:str,chaintype:str)->float:
             if chaintype in ['K','L']:
@@ -231,19 +297,118 @@ class hmt_FvProcessor(ResidueFeatureExtractor):
             chain_dict[chain_id].add(residue_copy)
 
         #build structure
-        builder=StructureBuilder()
-        builder.init_structure(structure_id='renumbered_Fv')
-        builder.init_model(0)
+        # builder=StructureBuilder()
+        # builder.init_structure(structure_id='renumbered_Fv')
+        # builder.init_model(0)
 
-        for chainid,chain in chain_dict.items():
-            add_chain(chain,chainid,builder.structure[0])
+        # for chainid,chain in chain_dict.items():
+        #     add_chain(chain,chainid,builder.structure[0])
         
-        self.built_structure=builder.get_structure()
-
+        # self.built_structure=builder.get_structure()
+        self.built_structure=build_structure(chain_dict,id='renumbered_Fv')
         return self.built_structure
+
+    def recombine_chain(self)->Structure:
+        if len(self.built_structure[0])==2:
+            return self.built_structure[0]
+        else:
+            ppb=PPBuilder(radius=5)
+            peps=ppb.build_peptides(self.built_structure)
+            judge_fv=[peptide_is_fv(i) for i in peps]
+
+            if judge_fv == [False,True,True]:
+                chainH=lk_fv(peps[0],peps[1],'H')
+                chainL=fv(peps[2],'L')
+
+            elif judge_fv == [True,False,True]:
+                if actually_same_chain(peps[0],peps[1]):
+                    chainH=fv_lk(peps[0],peps[1],'H')
+                    chainL=fv(peps[2],'L')
+                elif actually_same_chain(peps[1],peps[2]):
+                    chainH=fv(peps[0],'H')
+                    chainL=lk_fv(peps[1],peps[2],'L')
+                else:
+                    raise ValueError
+
+            elif judge_fv == [True,True,False]:
+                chainH=fv(peps[0],'H')
+                chainL=fv_lk(peps[1],peps[2],'L')
+
+            elif judge_fv == [False, True, False, True]:
+                if actually_same_chain(peps[1],peps[2]):
+                    chainH=lk_fv_lk(peps[0],peps[1],peps[2],'H')
+                    chainL=fv(peps[3],'L')
+                elif actually_same_chain(peps[1],peps[2]):
+                    chainH=lk_fv(peps[0],peps[1],'H')
+                    chainL=lk_fv(peps[2],peps[3],'L')
+                else:
+                    raise ValueError
+
+            elif judge_fv == [False, True, True, False]:
+                chainH=lk_fv(peps[0],peps[1],'H')
+                chainL=fv_lk(peps[2],peps[3],'L')
+
+            elif judge_fv == [True, False, True, False]:
+                if actually_same_chain(peps[0],peps[1]):
+                    chainH=fv_lk(peps[0],peps[1],'H')
+                    chainL=fv_lk(peps[2],peps[3],'L')
+                elif actually_same_chain(peps[1],peps[2]):
+                    chainH=fv(peps[0],'H')
+                    chainL=lk_fv_lk(peps[1],peps[2],peps[3],'L')
+                else:
+                    raise ValueError
+
+            elif judge_fv == [True, False, False, True]:
+                chainH=fv_lk(peps[0],peps[1],'H')
+                chainL=fv_lk(peps[2],peps[3],'L')
+            elif judge_fv == [False, True, False, False, True]:
+                chainH=lk_fv_lk(peps[0],peps[1],peps[2],'H')
+                chainL=lk_fv(peps[3],peps[4],'L')
+            elif judge_fv == [False, True, False, True, False ]:
+                if actually_same_chain(peps[1],peps[2]):
+                    chainH=lk_fv_lk(peps[0],peps[1],peps[2],'H')
+                    chainL=fv_lk(peps[3],peps[4],'L')
+                elif actually_same_chain(peps[2],peps[3]):
+                    chainH=lk_fv(peps[0],peps[1],'H')
+                    chainL=lk_fv_lk(peps[2],peps[3],peps[4],'L')
+                else:
+                    raise ValueError
+            elif judge_fv == [True, False, False, True, False ]:
+                chainH=fv_lk(peps[0],peps[1],'H')
+                chainL=lk_fv_lk(peps[2],peps[3],peps[4],'L')
+            elif judge_fv == [False, True, False, False, True, False]:
+                chainH=lk_fv_lk(peps[0],peps[1],peps[2],'H')
+                chainL=lk_fv_lk(peps[3],peps[4],peps[5],'L')
+            else:
+                raise ValueError
+            struct=build_structure({'H':chainH,'L':chainL},'integrate_Fv')
+            self.built_structure=struct
+            return struct
 
     def write_built_structure(self,filename:str):
         write_out(self.built_structure,filename)
+
+    def write_scheme_csv(self,filename:str):
+        self.object=self.built_structure
+        resid_list,resname_list,chainid_list,icode_list,cdr_list=[],[],[],[],[]
+        
+        for residue in integrated_residue_iterator(self.object):
+            resid_list.append(residue.id[1])
+            resname_list.append(residue.resname)
+            chainid_list.append(residue.get_parent().id)
+            icode_list.append(residue.id[2])
+            cdr_list.append(residue.xtra['CDR'])
+
+        output=pd.DataFrame()
+        output['resid']=resid_list
+        output['resname']=resname_list
+        output['chainid']=chainid_list
+        output['icode']=icode_list
+        output['CDR']=cdr_list
+        output.to_csv(filename,index=False)
+        # self.frame=pd.DataFrame()
+        # self._object_feature_to_frame()
+        # self.frame['CDR'].to_json(filename)
 
             
 
