@@ -15,7 +15,7 @@ from Bio.PDB.Entity import Entity
 from Bio.PDB.Residue import Residue
 from Bio.PDB.Atom import Atom
 import numpy as np
-from Data import amino3to1dict
+from .Data import amino3to1dict
 # from distance_util import idstr2tuple
 from typing import List,Tuple,Union,Generator,Iterable,Literal,Dict,Any,Callable
 from collections.abc import Iterable as collections_Iterable

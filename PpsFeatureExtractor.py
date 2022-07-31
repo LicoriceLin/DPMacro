@@ -6,13 +6,13 @@ from Bio.PDB.Residue import Residue
 from Bio.PDB.Structure import Structure
 from Bio.PDB.Chain import Chain
 # from numpy import matrix
-from BaseClasses import ResidueFeatureExtractor
-from distance_util import residue_distance_matrix,residue_within_threshold,distance_between_entity
-from util import allowed_residue_source,integrated_residue_iterator,sequence_from_object,impute_default_value,read_in,CHAIN_HOLDER,write_out
-from Data import hydrophobic_set,Charg_set,Aroma_set,SASA_scale,amino1to3dict
-from BiopyInternalFeature import impute_sasa,impute_angles,impute_hse,impute_dssp
-from TAPFeature import impute_surface,impute_static_feature,impute_fsasa
-from TAPFeature import impute_psh,impute_ppc,impute_pnc,impute_salt_bridge,impute_salted_charge_n_hydro
+from .BaseClasses import ResidueFeatureExtractor
+from .distance_util import residue_distance_matrix,residue_within_threshold,distance_between_entity
+from .util import allowed_residue_source,integrated_residue_iterator,sequence_from_object,impute_default_value,read_in,CHAIN_HOLDER,write_out
+from .Data import hydrophobic_set,Charg_set,Aroma_set,SASA_scale,amino1to3dict
+from .BiopyInternalFeature import impute_sasa,impute_angles,impute_hse,impute_dssp
+from .TAPFeature import impute_surface,impute_static_feature,impute_fsasa
+from .TAPFeature import impute_psh,impute_ppc,impute_pnc,impute_salt_bridge,impute_salted_charge_n_hydro
 
 def impute_PXX(object:allowed_residue_source,key:str,ref_set:Iterable[str]):
     '''

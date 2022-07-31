@@ -2,16 +2,17 @@
 useful tools involving spacial calculation.
 '''
 
-from Bio.PDB.Structure import Structure
-from Bio.PDB.Entity import Entity
-from Bio.PDB.Residue import Residue
+# from Bio.PDB.Structure import Structure
+# from Bio.PDB.Entity import Entity
+# from Bio.PDB.Residue import Residue
 from typing import List,Tuple,Union,Dict
 # import typing
 from Bio.PDB.Atom import Atom
 from Bio.PDB.kdtrees import KDTree
 import numpy as np
 import pandas as pd
-from util import integrated_residue_iterator,integrated_atom_iterator,allowed_residue_source
+from .util import Structure,Entity,Residue
+from .util import integrated_residue_iterator,integrated_atom_iterator,allowed_residue_source
 # import warnings
 # from Bio import BiopythonParserWarning
 

@@ -14,14 +14,14 @@ from Bio.PDB import ShrakeRupley
 
 from typing import Iterable
 
-from BaseClasses import ResidueFeatureExtractor,SeqFeatureExtractor
-import distance_util as du
-from util import integrated_residue_iterator,allowed_residue_source,allowd_scheme,impute_default_value
-from util import RESIDUE_HOLDER
-from Data import *
-from distance_util import residue_distance_matrix
-from CdrAnnotator import run_anarci,impute_cdr
-from BiopyInternalFeature import impute_sasa,impute_dssp
+from .BaseClasses import ResidueFeatureExtractor,SeqFeatureExtractor
+from . import distance_util as du
+from .util import integrated_residue_iterator,allowed_residue_source,allowd_scheme,impute_default_value
+from .util import RESIDUE_HOLDER
+from .Data import *
+from .distance_util import residue_distance_matrix
+from .CdrAnnotator import run_anarci,impute_cdr
+from .BiopyInternalFeature import impute_sasa,impute_dssp
 import warnings
 
 

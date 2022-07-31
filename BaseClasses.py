@@ -13,10 +13,10 @@ from Bio.PDB.Entity import Entity
 import pandas as pd
 # import numpy as np
 from typing import Union,Tuple,Dict,Iterable
-from util import read_in,extract_hetatm,sequence_from_frame
-from util import _list_feature_into_residue,_list_feature_into_frame,integrated_residue_iterator
-from util import allowed_residue_source,allowd_scheme,RESIDUE_HOLDER
-from Data import amino3to1dict
+from .util import read_in,extract_hetatm,sequence_from_frame
+from .util import _list_feature_into_residue,_list_feature_into_frame,integrated_residue_iterator
+from .util import allowed_residue_source,allowd_scheme,RESIDUE_HOLDER
+from .Data import amino3to1dict
 
 class StructFeatureExtractor:
     '''

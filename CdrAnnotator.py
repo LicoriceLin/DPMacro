@@ -12,17 +12,17 @@ import anarci
 import pandas as pd
 
 # from Bio.PDB.Structure import Structure
-from Bio.PDB.Entity import Entity
+# from Bio.PDB.Entity import Entity
 # from Bio.PDB.Atom import Atom
-from Bio.PDB.Chain import Chain
+# from Bio.PDB.Chain import Chain
 from Bio.PDB.StructureBuilder import StructureBuilder
-
-from BaseClasses import ResidueFeatureExtractor
-from util import _list_feature_into_residue,_list_feature_into_frame,integrated_residue_iterator
-from util import write_out,add_chain
-from util import allowed_residue_source,allowd_scheme
-from Data import CDR_annotations
-import distance_util as du
+from .util import Entity,Chain
+from .BaseClasses import ResidueFeatureExtractor
+from .util import _list_feature_into_residue,_list_feature_into_frame,integrated_residue_iterator
+from .util import write_out,add_chain
+from .util import allowed_residue_source,allowd_scheme
+from .Data import CDR_annotations
+from . import distance_util as du
 
 def run_anarci(sequence_dict:Dict[str,str],scheme:allowd_scheme='a',
                 object:Union[allowed_residue_source,None]=None,frame:Union[pd.DataFrame,None]=None)->Tuple[list,list,list]:
