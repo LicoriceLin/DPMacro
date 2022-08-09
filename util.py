@@ -7,7 +7,7 @@ some useful recurrent codes
 # import imp
 import Bio.PDB as BP
 import pandas as pd 
-import re
+import re,os
 from Bio.PDB.Chain import Chain
 from Bio.PDB.Structure import Structure
 from Bio.PDB.Model import Model
@@ -55,6 +55,18 @@ def write_out(strcture:Entity,file:str='tmp.pdb',write_end:bool=True, preserve_a
     io = BP.PDBIO()
     io.set_structure(strcture)
     io.save(file,write_end=write_end,preserve_atom_numbering=preserve_atom_numbering)
+
+def split_frame(file:str)->None:
+    s=read_in(file)
+    # if len(s)<=1:
+    # 单个结构的？
+    if len(s)<1:
+        raise ValueError
+    outdir=file.replace('.pdb','')
+    if not os.path.isdir(outdir):
+        os.mkdir(outdir)
+    for i,frame in enumerate(s):
+        write_out(frame,os.path.join(outdir,f'{i}.pdb'))
 
 def impute_beta(object:allowed_residue_source,func:Callable[[Residue], float]):
     '''

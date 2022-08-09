@@ -2,7 +2,7 @@ from typing import Dict
 import tempfile
 import os
 
-from BaseClasses import ResidueFeatureExtractor
+from .BaseClasses import ResidueFeatureExtractor
 from Bio.PDB.Structure import Structure
 from Bio.PDB import DSSP,ShrakeRupley,HSExposureCB
 
