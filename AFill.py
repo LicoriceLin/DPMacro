@@ -8,14 +8,14 @@ from Bio import AlignIO
 
 import pymol
 
-from BaseClasses import ResidueFeatureExtractor
+from .BaseClasses import ResidueFeatureExtractor
 from Bio.PDB.Structure import Structure
 from Bio.PDB.Residue import Residue
 from Bio.PDB.Chain import Chain
-from util import RESIDUE_HOLDER,allowed_residue_source
-from util import read_in,integrated_residue_iterator,sequence_from_object,write_fasta,wash_sequence
-from distance_util import residue_within_threshold 
-from Data import amino3to1dict,nucleic_acid_dict
+from .util import RESIDUE_HOLDER,allowed_residue_source
+from .util import read_in,integrated_residue_iterator,sequence_from_object,write_fasta,wash_sequence
+from .distance_util import residue_within_threshold 
+from .Data import amino3to1dict,nucleic_acid_dict
 
    
 

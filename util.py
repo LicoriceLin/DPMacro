@@ -7,7 +7,7 @@ some useful recurrent codes
 # import imp
 import Bio.PDB as BP
 import pandas as pd 
-import re
+import re,os
 from Bio.PDB.Chain import Chain
 from Bio.PDB.Structure import Structure
 from Bio.PDB.Model import Model
@@ -15,7 +15,7 @@ from Bio.PDB.Entity import Entity
 from Bio.PDB.Residue import Residue
 from Bio.PDB.Atom import Atom
 import numpy as np
-from Data import amino3to1dict
+from .Data import amino3to1dict
 # from distance_util import idstr2tuple
 from typing import List,Tuple,Union,Generator,Iterable,Literal,Dict,Any,Callable
 from collections.abc import Iterable as collections_Iterable
@@ -55,6 +55,30 @@ def write_out(strcture:Entity,file:str='tmp.pdb',write_end:bool=True, preserve_a
     io = BP.PDBIO()
     io.set_structure(strcture)
     io.save(file,write_end=write_end,preserve_atom_numbering=preserve_atom_numbering)
+
+def split_frame(file:str)->None:
+    s=read_in(file)
+    # if len(s)<=1:
+    # 单个结构的？
+    if len(s)<1:
+        raise ValueError
+    outdir=file.replace('.pdb','')
+    if not os.path.isdir(outdir):
+        os.mkdir(outdir)
+    for i,frame in enumerate(s):
+        write_out(frame,os.path.join(outdir,f'{i}.pdb'))
+
+def model(residues:allowed_residue_source)->Model:
+    residue_list=list(integrated_residue_iterator(residues))
+    residue_list.sort(key=lambda x :-ord(x.get_parent().id)*10000+x.id[1])
+    model=Model('0')
+    for residue in residue_list:
+        chainid=residue.get_parent().id
+        if chainid not in model:
+            new_chain=Chain(chainid)
+            model.add(new_chain)
+        model[chainid].add(residue.copy())
+    return model
 
 def impute_beta(object:allowed_residue_source,func:Callable[[Residue], float]):
     '''

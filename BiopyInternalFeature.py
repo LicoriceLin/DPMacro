@@ -2,12 +2,13 @@ from typing import Dict
 import tempfile
 import os
 
-from BaseClasses import ResidueFeatureExtractor
+
+from .BaseClasses import ResidueFeatureExtractor
 from Bio.PDB.Structure import Structure
 from Bio.PDB import DSSP,ShrakeRupley,HSExposureCB
 
-from util import write_out
-from util import integrated_residue_iterator,allowed_residue_source,impute_default_value
+from .util import write_out
+from .util import integrated_residue_iterator,allowed_residue_source,impute_default_value
 
 def impute_dssp(object:Structure,dssp_argsargs:Dict={}):
     '''

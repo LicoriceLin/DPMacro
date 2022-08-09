@@ -8,7 +8,7 @@ import pandas as pd
 import Bio.PDB as BP
 import anarci
 import re
-from util import read_in,write_out,extract_hetatm,add_chain
+from .util import read_in,write_out,extract_hetatm,add_chain
 
 from Bio.PDB.StructureBuilder import StructureBuilder
 from Bio.Data import SCOPData
