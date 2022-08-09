@@ -68,6 +68,18 @@ def split_frame(file:str)->None:
     for i,frame in enumerate(s):
         write_out(frame,os.path.join(outdir,f'{i}.pdb'))
 
+def model(residues:allowed_residue_source)->Model:
+    residue_list=list(integrated_residue_iterator(residues))
+    residue_list.sort(key=lambda x :-ord(x.get_parent().id)*10000+x.id[1])
+    model=Model('0')
+    for residue in residue_list:
+        chainid=residue.get_parent().id
+        if chainid not in model:
+            new_chain=Chain(chainid)
+            model.add(new_chain)
+        model[chainid].add(residue.copy())
+    return model
+
 def impute_beta(object:allowed_residue_source,func:Callable[[Residue], float]):
     '''
     func needs a Residue as input, a float as output

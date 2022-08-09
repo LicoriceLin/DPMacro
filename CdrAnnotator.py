@@ -209,6 +209,9 @@ def fv(pep1:List[Residue],id:str)->Chain:
     return build_new_chain_from_pep([pep1],id)
 
 def build_structure(chain_dict:Dict[str,Chain],id:str='tmp')->Structure:
+    '''
+    please switch to util.model to get a proper Model object.
+    '''
     builder=StructureBuilder()
     builder.init_structure(structure_id=id)
     builder.init_model(0)
@@ -218,6 +221,61 @@ def build_structure(chain_dict:Dict[str,Chain],id:str='tmp')->Structure:
     
     return builder.get_structure()
 
+def check_H(seq:str,scheme:str='i')->bool:
+    try:
+        try:
+            ana_=anarci.run_anarci(seq,scheme=scheme)
+        except:
+            print('the sequence contains uncanonical component!')
+            out = False
+        fv_count=len(ana_[1][0]) if ana_[1][0] is not None else 0
+        if fv_count!=1:
+            print(f'Fv count is {fv_count}, but 1 is expected')
+            out =  False
+        else:
+            chain_type=ana_[2][0][0]['chain_type']
+            if chain_type!='H':
+                print(f'Fv type is {chain_type} , but H is expected')
+                out = False
+            else:
+                true_seq=''.join([i[1] for i in ana_[1][0][0][0] if i[1]!='-'])
+                if len(seq)-len(true_seq) > 15:
+                    print('there are so much redundant residues, which will lead to poor prediction!')
+                    print(f'canonical seq is {true_seq},try after removing other components')
+                else:
+                    out = True
+    except:
+        print('unexpected error!')
+        out = False
+    return out
+
+def check_L(seq:str,scheme:str='i')->bool:
+    try:
+        try:
+            ana_=anarci.run_anarci(seq,scheme=scheme)
+        except:
+            print('the sequence contains uncanonical component!')
+            out = False
+        fv_count=len(ana_[1][0]) if ana_[1][0] is not None else 0
+        if fv_count!=1:
+            print(f'Fv count is {fv_count}, but 1 is expected')
+            out =  False
+        else:
+            chain_type=ana_[2][0][0]['chain_type']
+            if chain_type not in ['K','L']:
+                print(f'Fv type is {chain_type} , but H is expected')
+                out = False
+            else:
+                true_seq=''.join([i[1] for i in ana_[1][0][0][0] if i[1]!='-'])
+                if len(seq)-len(true_seq) > 15:
+                    print('there are so much redundant residues, which will lead to poor prediction!')
+                    print(f'canonical seq is {true_seq},try after removing other components')
+                else:
+                    out = True
+    except:
+        print('unexpected error!')
+        out = False
+    return out
 
 class hmt_FvProcessor(ResidueFeatureExtractor):
     def __init__(self, scheme:allowd_scheme) -> None:
@@ -407,6 +465,9 @@ class hmt_FvProcessor(ResidueFeatureExtractor):
 
 
 class BAb(ResidueFeatureExtractor):
+    '''
+    under construction.
+    '''
     def __init__(self,scheme):
         self.scheme=scheme
         ResidueFeatureExtractor.__init__(self,operation_name='BAb',canonical_only=False)

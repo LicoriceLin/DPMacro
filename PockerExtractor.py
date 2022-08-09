@@ -11,7 +11,7 @@ import pymol
 from .BaseClasses import ResidueFeatureExtractor
 from .util import Structure,Residue,Chain,Model
 from .util import RESIDUE_HOLDER,allowed_residue_source
-from .util import integrated_residue_iterator,write_out
+from .util import integrated_residue_iterator,write_out,model
 from .distance_util import residue_within_threshold 
 from .Data import amino3to1dict,nucleic_acid_dict
 
@@ -34,18 +34,6 @@ def reslist_to_guicode(reslist:allowed_residue_source,guiplatform:allowed_platfo
             return  '(chain ' + str(chain.id) + ' and resid ' + str(residue.id[1])+' )'
     return '( '+' or '.join([chain_n_residue(i) for i in integrated_residue_iterator(reslist) 
                                             if i.parent.id != 'place_holder'])+' )'
-
-def model(residues:allowed_residue_source)->Model:
-    residue_list=list(integrated_residue_iterator(residues))
-    residue_list.sort(key=lambda x :-ord(x.get_parent().id)*10000+x.id[1])
-    model=Model('0')
-    for residue in residue_list:
-        chainid=residue.get_parent().id
-        if chainid not in model:
-            new_chain=Chain(chainid)
-            model.add(new_chain)
-        model[chainid].add(residue.copy())
-    return model
 
 class PocketExtractor(ResidueFeatureExtractor):
 # class structure_aligner:
