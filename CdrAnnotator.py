@@ -12,6 +12,7 @@ import pandas as pd
 from itertools import chain
 from numpy.linalg import norm
 
+
 from Bio.PDB.StructureBuilder import StructureBuilder
 from Bio.PDB.Polypeptide import PPBuilder
 
@@ -463,7 +464,6 @@ class hmt_FvProcessor(ResidueFeatureExtractor):
         # self._object_feature_to_frame()
         # self.frame['CDR'].to_json(filename)
 
-
 class BAb(ResidueFeatureExtractor):
     '''
     under construction.
@@ -491,3 +491,4 @@ class BAb(ResidueFeatureExtractor):
         run_anarci(self.sequences,self.scheme,self.object)
         impute_cdr(self.object,self.scheme)
         self._object_feature_to_frame()
+
