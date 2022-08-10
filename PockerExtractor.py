@@ -42,7 +42,7 @@ class PocketExtractor(ResidueFeatureExtractor):
         set rna=True if processing RNA
         so far it only affects the generation of self.sequences and self.reference_sequences
         '''
-        ResidueFeatureExtractor.__init__(self,operation_name='AFill_aligner', 
+        ResidueFeatureExtractor.__init__(self,operation_name='PocketExtractor', 
                                             canonical_only=False)
 
     def load_structure(self,struct:Union[str,Structure])->None:
@@ -85,22 +85,36 @@ class PocketExtractor(ResidueFeatureExtractor):
         assert ligand in self.ligands,'invalid ligand!'
         self.selected_ligand=ligand
         self.pocket=residue_within_threshold(self.proteins,self.selected_ligand,distance)
+        self._to_model()
         # self.neighbor_chain= tuple(set([i.get_parent().id for i in self.neighbor]))
         # add return
 
-    def set_chain_as_ligand(self,chain:Chain):
+    def set_chain_as_ligand(self,chain:Chain,distance:float=6):
         assert chain in list(self.reference.get_chains()),'invalid chain'
         self.selected_ligand=chain
         _other_residue=[ residue for residue in self.proteins if residue not in list(chain.get_residues()) ]
-        self.neighbor=residue_within_threshold(_other_residue,self.selected_ligand,6)
+        self.pocket=residue_within_threshold(_other_residue,self.selected_ligand,distance)
+        self._to_model()
 
+    def flexible_set_ligand(self,reses:allowed_residue_source,distance:float=6):
+        self.selected_ligand=reses
+        _other_residue=[ residue for residue in self.object.get_residues() if residue not in list(integrated_residue_iterator(reses)) ]
+        self.pocket=residue_within_threshold(_other_residue,self.selected_ligand,distance)
+        self._to_model()
+    def _to_model(self):
+        self.ligand_model=model(self.selected_ligand)
+        self.pocket_model=model(self.pocket)
+        self.lig_poc_model=model(self.selected_ligand+self.pocket)
     def save(self,prefix:str=""):
         '''
         save the ligand and the pocket with the given profix 
         '''
-        write_out(model(self.selected_ligand),f'{prefix}_ligand.pdb')
-        write_out(model(self.pocket),f'{prefix}_pocket.pdb')
+        write_out(self.ligand_model,f'{prefix}_ligand.pdb')
+        write_out(self.pocket_model,f'{prefix}_pocket.pdb')
 
+    def save_as_whole(self,out='ligand-complex.pdb'):
+        
+        write_out(self.lig_poc_model,out)
     def transform(self,**kwargs) :
         raise NotImplementedError
        

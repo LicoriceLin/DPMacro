@@ -3,4 +3,5 @@ conda activate DPMacro && \
 conda install -c salilab dssp && \
 conda install anarci -c bioconda && \
 conda install -c bioconda clustalw && \
-conda install -c conda-forge pymol-open-source 
+conda install -c conda-forge pymol-open-source && \
+conda install pandas && \
