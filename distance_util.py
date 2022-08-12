@@ -7,10 +7,11 @@ useful tools involving spacial calculation.
 # from Bio.PDB.Residue import Residue
 from typing import List,Tuple,Union,Dict
 # import typing
-from Bio.PDB.Atom import Atom
+from Bio.PDB.Atom import Atom,DisorderedAtom
 from Bio.PDB.kdtrees import KDTree
 import numpy as np
 import pandas as pd
+from soupsieve import select
 from .util import Structure,Entity,Residue
 from .util import integrated_residue_iterator,integrated_atom_iterator,allowed_residue_source
 # import warnings
@@ -37,11 +38,20 @@ def produce_tree(object:allowed_residue_source)->Tuple[pd.DataFrame,KDTree]:
     _atom_resname_list=[]
     _atom_list=[]
     for atom in integrated_atom_iterator(object):
+        if isinstance(atom,Atom):
+            pass
+        elif isinstance(atom,DisorderedAtom):
+            atom=atom.selected_child
+        else:
+            raise ValueError('unexpect atom entity')
         _full_id=atom.get_full_id()[1:]
         _atom_index_list.append([idtuple2str(i) for i in _full_id])
         _atom_coord_list.append(atom.coord)
         _atom_resname_list.append([atom.get_parent().get_resname()])
         _atom_list.append(atom)
+    
+            # atom:DisorderedAtom=1
+            
     
     atom_index=np.array(_atom_index_list,dtype=str)
     atom_coord=np.array(_atom_coord_list,dtype=np.float64)
@@ -51,6 +61,8 @@ def produce_tree(object:allowed_residue_source)->Tuple[pd.DataFrame,KDTree]:
     frame=pd.DataFrame(np.concatenate([atom_index,atom_resname],axis=1),columns=['model','chain','residue','atom','resname'])
     coord_frame=pd.DataFrame(atom_coord,columns=list('xyz'))
     atom_frame=pd.DataFrame(_atom_list,columns=['object'])
+    # atom_frame=pd.DataFrame()
+    # atom_frame['object']=pd.DataFrame(_atom_list)[0]
     frame=frame.join(coord_frame,how='right')
     frame=frame.join(atom_frame,how='right')
     return frame,tree
