@@ -57,7 +57,7 @@ class PocketExtractor(ResidueFeatureExtractor):
         self._set_structure(struct)
         assert len(self.object)==1,'please plit the frames first!'
         self._find_ligands()
-        self._find_proteins()
+        # self._find_proteins()
 
     def _find_ligands(self):
         '''
@@ -72,7 +72,7 @@ class PocketExtractor(ResidueFeatureExtractor):
         set the self.protein,a list (may transfer to a Tuple later) containing all protein Residue instance in obj.
         '''
         self.proteins:List[Residue]=[i for i in integrated_residue_iterator(self.object) 
-                        if i.id[0]==' ']
+                        if i not in self.ligands and i.id[0]!='W']
     
     def set_ligand(self,ligand:Residue,distance:float=6):
         '''
@@ -84,7 +84,7 @@ class PocketExtractor(ResidueFeatureExtractor):
         '''
         assert ligand in self.ligands,'invalid ligand!'
         self.selected_ligand=ligand
-        self.pocket=residue_within_threshold(self.proteins,self.selected_ligand,distance)
+        self.pocket=residue_within_threshold([residue for residue in integrated_residue_iterator(self.object) if not residue is self.selected_ligand ],self.selected_ligand,distance)
         self._to_model()
         # self.neighbor_chain= tuple(set([i.get_parent().id for i in self.neighbor]))
         # add return
@@ -104,7 +104,7 @@ class PocketExtractor(ResidueFeatureExtractor):
     def _to_model(self):
         self.ligand_model=model(self.selected_ligand)
         self.pocket_model=model(self.pocket)
-        self.lig_poc_model=model(self.selected_ligand+self.pocket)
+        self.lig_poc_model=model(list(integrated_residue_iterator(self.selected_ligand))+self.pocket)
     def save(self,prefix:str=""):
         '''
         save the ligand and the pocket with the given profix 
