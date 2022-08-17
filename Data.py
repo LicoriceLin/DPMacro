@@ -43,6 +43,7 @@ amino3to1dict = {
         'HID': 'H','HIE': 'H','HIP':'H','MSE': 'M'}
 }
 
+Canonical_amino_set=set(list(amino3to1dict.keys()))
 
 #scheme information
 base_CDR_annotations = {'imgt':{
@@ -215,3 +216,44 @@ GeorgeDSASA_scale = {
 hydrophobic_set={'VAL','ILE','LEU','PHE','MET','TYR','TRP','CYS'}
 Charg_set={'ARG','LYS','ASP','GLU'}
 Aroma_set={'PHE','TYR','TRP'}
+
+
+Inorganic_set=set([
+    'HOH','MG','CA','SO4','K','NA','BA','CD','PB','MN','CL',
+    'CS','CO','SR','RB','IRI','O','NH2','PO4','CYN','CMO','ZN',
+    'NO3','FE','SCN','NI','HG','CAC','BR','NH4','XE','CU1'
+
+])
+
+Glycoside_set=set([
+    'NAG','MAN','BMA','NDG','BGC','FUC','A2G','NGA'
+])
+
+Small_organic_set=set([
+    'ACA','NCO','GAI','GOL','ACT','PHA','EDO','PEG',
+    'AXO','PG4','BU3','PGE','OCT','D12','1PE','ARF',
+    'TRS','IPA','AKG','ACE','LDA','PE4','F09','MPD',
+    'BCN','MPT','MLT','C14','HEX','OLA','OLB','OLC',
+    'ACY','HEZ','HP6','L2C','TBA','CIT','DGA','ETX',
+    'MLA','LHV','HX0'
+])
+
+Organic_set=set([
+    'EPE','PCA','HEC','10M','HEM','HEC','GTP','PTY',
+    'Y01','4NB','JYS','Z07','SIP','ZGS','NIF','09N',
+    'ZQU','3PE','NHE','LMT','SRE','CLR','8PR','D84',
+    'PUC','DLP','9K4','C6N','AJP','PKZ','LMH','PX4',
+    'RFY','BHC','MTN','3PH','LNK','MES','CDL','1EM',
+    'U2X','DMU','68P','LPX','CHO','O50','LMN','GJ9',
+    'OH6','2CU','H98','RFS','FVX','IXX','YG7','15P',
+    '8VL','7UR','0LY','6PE','69D','97Y','MKZ','TA1'
+
+])
+
+Unknown_set=set([
+    'UNL','UNX'
+])
+
+modi_nt_set=set(['5MG','N','7MG', 'M2G','2MA','5MC','1MA','PSU',
+'OMG','PSU','CCC','TG','G4P','LCC','LKC','GDP','GTP','5BU','GFL','LCG',
+'2MG','5MU','UR3','TLN','BGM','GAO','GDO','GF2'])

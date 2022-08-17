@@ -25,6 +25,14 @@ from .Data import CDR_annotations
 # import distance_util as du
 
 
+class anarci_wrapper:
+    def __init__(self,seq,scheme):
+        _=anarci.run_anarci(seq,scheme)
+        self.sequence=_[0][0][1]
+        self.fv_count=len(_[1][0])
+        self.fv_numberings=_[1][0]
+        self.meta_info=_[2][0]
+        self.species=_[3][0]
 
 def run_anarci(sequence_dict:Dict[str,str],scheme:allowd_scheme='a',
                 object:Union[allowed_residue_source,None]=None,frame:Union[pd.DataFrame,None]=None)->Tuple[list,list,list]:
