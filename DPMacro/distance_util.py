@@ -11,7 +11,6 @@ from Bio.PDB.Atom import Atom,DisorderedAtom
 from Bio.PDB.kdtrees import KDTree
 import numpy as np
 import pandas as pd
-from soupsieve import select
 from .util import Structure,Entity,Residue
 from .util import integrated_residue_iterator,integrated_atom_iterator,allowed_residue_source
 # import warnings
