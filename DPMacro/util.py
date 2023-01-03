@@ -59,7 +59,6 @@ def write_out(strcture:Entity,file:str='tmp.pdb',write_end:bool=True, preserve_a
 def split_frame(file:str)->None:
     s=read_in(file)
     # if len(s)<=1:
-    # 单个结构的？
     if len(s)<1:
         raise ValueError
     outdir=file.replace('.pdb','')

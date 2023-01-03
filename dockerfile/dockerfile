@@ -1,0 +1,7 @@
+FROM registry.dp.tech/dptech/ubuntu:20.04-py37
+COPY ./ /root/DPMacro
+WORKDIR /root/DPMacro
+RUN conda env create -f environment.yaml && \
+    /opt/miniconda/envs/DPMacro/bin/python setup.py install && \
+    apt-get update && \
+    apt-get install ffmpeg libsm6 libxext6  -y
