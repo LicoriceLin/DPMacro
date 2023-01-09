@@ -16,9 +16,6 @@ def write_tap(infile:str):
     o_dict['psh_r']=tap.frame['psh'].to_list()
     o_dict['ppc_r']=tap.frame['ppc'].to_list()
     o_dict['pnc_r']=tap.frame['pnc'].to_list()    
-    # out=f'{file_id},{cdr_lenth},{psh},{ppc},{pnc},{SFvCSP}\n'
-    # with open(outfile,'a') as f:
-    #     f.write(out)
     return o_dict
 
 if __name__=='__main__':

@@ -138,6 +138,16 @@ def impute_default_value(object:allowed_residue_source,key:str,default_value:Any
     for residue in integrated_residue_iterator(object):
         residue.xtra[key]=residue.xtra.get(key,default_value)
 
+def parent_dir(path:str,level:int)->str:
+    '''
+    a tmp function to get a specific segemtation of path.
+    level: 0:filename,1:name of '.',2:name of '../' 3:'../../' '''
+    i=0
+    while i<level:
+        path=os.path.split(path)[0]
+        i+=1
+    path=os.path.split(path)[1]
+    return path
 
 def sequence_from_object(object:Union[Structure,Model],map:dict=amino3to1dict)->Dict[str,str]:
     '''
