@@ -3,8 +3,10 @@ library of constant,
 
 '''
 # from Bio.Data.IUPACData import protein_letters_3to1,protein_letters_1to3
-from Bio.Data import SCOPData
-
+try:
+    from Bio.Data import PDBData
+except:
+    from Bio.Data import SCOPData as PDBData
 
 #3-letter code <-> 1-letter code
 amino1to3dict={
@@ -38,7 +40,7 @@ nucleic_acid_dict = {
     'T':'T'
 }
 amino3to1dict = {
-    **SCOPData.protein_letters_3to1,
+    **PDBData.protein_letters_3to1,
     **{'ASH': 'A','CYX': 'C','HYP': 'P',
         'HID': 'H','HIE': 'H','HIP':'H','MSE': 'M'}
 }

@@ -2,13 +2,20 @@ from setuptools import setup,find_packages
 #please use the environment.yaml to build env!
 #key component is annotated inside the install_requires
 install_requires = [
-    # "biopython==1.79", "pandas==1.4.0", "biopandas==0.2.9",
-    # "biopandas", "rdkit", "anarci==2021.02.04","rdkit","clustalw","dssp==3.0.0"
-
+    "biopython==1.79", "pandas==1.4.0", "biopandas==0.2.9", 
+    
+    ## optional, only work in Fv modules
+    # "anarci==2021.02.04",
+    
+    ## optional, only work in AFill.
+    # "clustalw","dssp==3.0.0"
+    
+    ## maybe useful?
+    # "rdkit", 
 ]
 setup(
     name='DPMacro',
-    version='0.1',
+    version='0.3',
     author='LicoriceLin',
     author_email='dengzf@dptech.net',
     description=('PDB structure manipulation and feature engineering.'),
