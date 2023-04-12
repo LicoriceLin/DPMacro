@@ -11,7 +11,7 @@ import re
 from .util import read_in,write_out,extract_hetatm,add_chain
 
 from Bio.PDB.StructureBuilder import StructureBuilder
-from Bio.Data import SCOPData
+from Bio.Data import PDBData
 from Bio.PDB.Chain import Chain
 from Bio.PDB.Structure import Structure
 from Bio import BiopythonParserWarning,BiopythonWarning
@@ -44,7 +44,7 @@ class FvSpliter:
         self.residue_map=pd.DataFrame()
         self.residue_map['original_id']=[residue.id for residue in self.object]
         self.residue_map.set_index(['original_id'],inplace=True)
-        self.residue_map['residue_type']=[SCOPData.protein_letters_3to1[residue.get_resname()] 
+        self.residue_map['residue_type']=[PDBData.protein_letters_3to1[residue.get_resname()] 
                                             for residue in self.object]
         self.sequence=''.join(self.residue_map['residue_type'])
    
@@ -131,7 +131,7 @@ class FvStructureProcesser:
             warnings.warn("multi-frame object detected."
              "only frame 0 will be processed.",
              BiopythonParserWarning,)
-        self.chain_list={chain.id :''.join([SCOPData.protein_letters_3to1[residue.get_resname()] 
+        self.chain_list={chain.id :''.join([PDBData.protein_letters_3to1[residue.get_resname()] 
                                             for residue in chain 
                                             if residue.id[0]==' ']) 
                                             for chain in self.object[0] if len(chain)>0}
@@ -154,8 +154,9 @@ class FvStructureProcesser:
                 spliter.set_chain(self.object[0][chain_id])
                 self.splited_chains[chain_id]=spliter.split(self.scheme)
             else:
-                hetatm_chain=extract_hetatm(self.object[0][chain_id])
-                self.splited_chains[chain_id]={'Ag0':self.object[0][chain_id],'hetatm':hetatm_chain}
+                ag0,htm=extract_hetatm(self.object[0][chain_id])
+                ag0.id='Ag0'
+                self.splited_chains[chain_id]={'Ag0':ag0,'hetatm':htm}
     
     def build_whole(self,
                     structure_id:str='tmp',

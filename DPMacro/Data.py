@@ -8,6 +8,7 @@ try:
 except:
     from Bio.Data import SCOPData as PDBData
 
+from typing import Dict
 #3-letter code <-> 1-letter code
 amino1to3dict={
                   'A':'ALA',
@@ -133,6 +134,17 @@ CDR_annotations = {
     'k|K':base_CDR_annotations['kabat|K']
              }
 
+def _annotation2map(CDR_annotations)-> Dict[int,str]:
+    sl=[(k,v) for (k,v) in CDR_annotations.items()]
+    o={}
+    for i in range(len(sl)-1):
+        o.update({j:sl[i][0] for j in range(sl[i][1],sl[i+1][1])})
+    return o
+
+CDR_maps = {
+    k:_annotation2map(v) for k,v 
+    in  CDR_annotations.items()
+    }
 
 #static residue property
 hydrophobicity_scale = {

@@ -17,12 +17,15 @@ from Bio.PDB.Atom import Atom
 import numpy as np
 from .Data import amino3to1dict
 # from distance_util import idstr2tuple
-from typing import List,Tuple,Union,Generator,Iterable,Literal,Dict,Any,Callable
+from typing import (List,Tuple,Union,Generator,Optional,
+                    Iterable,Literal,Dict,Any,Callable)
 from collections.abc import Iterable as collections_Iterable
 
 # allowd_scheme=Literal['c','chothia','k','kabat','i','imgt','a','aho','m','martin','w','wolfguy']
 allowd_scheme=Literal['c','chothia','k','kabat','i','imgt','a','aho']
 allowed_residue_source=Union[Entity,Iterable[Entity],Atom,Iterable[Atom]]
+id=Tuple[str,int,str]
+idmap=Dict[id,id]
 STRUCTURE_HOLDER=Structure('place_holder')
 MODEL_HOLDER=Model('place_holder')
 CHAIN_HOLDER=Chain('place_holder')
@@ -66,6 +69,28 @@ def split_frame(file:str)->None:
         os.mkdir(outdir)
     for i,frame in enumerate(s):
         write_out(frame,os.path.join(outdir,f'{i}.pdb'))
+
+def add_child(f:Entity,s:Entity,id:Union[str,int]):
+    '''
+    '''
+    if id in f.child_dict:
+        f.detach_child(id)
+    s.id=id
+    f.add(s)
+    
+def renum(chain:Chain,resmap:Optional[idmap]=None)->Tuple[Chain,idmap]:
+    '''
+    '''
+    if resmap is None:
+        resmap={residue.id:(' ',i+1,' ') for i,residue in enumerate(chain)}
+
+    newchain=Chain(0)
+    for res in chain:
+        r=res.copy()
+        r.detach_parent()
+        r.id=resmap[r.id]
+        newchain.add(r)
+    return newchain,resmap
 
 def model(residues:allowed_residue_source)->Model:
     residue_list=list(integrated_residue_iterator(residues))
