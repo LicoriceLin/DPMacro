@@ -11,7 +11,10 @@ import re
 from .util import read_in,write_out,extract_hetatm,add_chain
 
 from Bio.PDB.StructureBuilder import StructureBuilder
-from Bio.Data import PDBData
+try:
+    from Bio.Data import PDBData
+except:
+    from Bio.Data import SCOPData as PDBData
 from Bio.PDB.Chain import Chain
 from Bio.PDB.Structure import Structure
 from Bio import BiopythonParserWarning,BiopythonWarning
