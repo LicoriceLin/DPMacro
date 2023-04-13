@@ -10,7 +10,7 @@ import numpy as np
 from Bio import BiopythonParserWarning
 from Bio.PDB.Residue import Residue
 from Bio.PDB.Atom import Atom
-from Bio.PDB import ShrakeRupley
+from Bio.PDB.SASA import ShrakeRupley
 
 from typing import Iterable
 
